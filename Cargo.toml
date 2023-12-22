@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 crossterm = "0.27.0"
 num-traits = "0.2.16"
-ratatui = "0.24.0"
+ratatui = { version = "0.25.0", features = ["unstable-rendered-line-info"] }
 textwrap = "0.16.0"
 
 [features]

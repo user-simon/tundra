@@ -235,68 +235,67 @@ impl Dialog for Confirm<'_> {
 fn draw_dialog(info: DrawInfo, frame: &mut Frame) {
     const HORIZONTAL_MARGIN: u16 = 3;
     const VERTICAL_MARGIN: u16 = 1;
+    const WIDTH_FACTOR: f32 = 0.5;
 
     let DrawInfo{ title, body, color, hint } = info;
-    
-    let hint = Text::from(hint);
+
+    let wrap = Wrap{ trim: false };
+    let hint = Paragraph::new(hint).wrap(wrap);
+    let body = Paragraph::new(body).wrap(wrap);
+
     let frame_size = frame.size();
-    let inner_width = frame_size.width / 2;
-    let [body_height, hint_height] = [&body, &hint].map(|t|
-        wrapped_height(t, inner_width)
-    );
-    // compute the minimum height needed to display all text. note that the actual inner area may differ
-    // since the outer vertical margins are computed using floored division; the inner area will be one
-    // unit too high when the frame has an odd-numbered height. this extra unit is delegated to the
-    // margin between the body and hint
-    let inner_height = body_height + hint_height + 1;
+    let inner_width = (frame_size.width as f32 * WIDTH_FACTOR) as u16;
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(format!(" {} ", title.to_uppercase()))
-        .border_type(BorderType::Thick)
-        .fg(color);
-    let [outer_width, outer_height] = outer_size(
-        &block, 
-        inner_width + HORIZONTAL_MARGIN * 2, 
-        inner_height + VERTICAL_MARGIN * 2, 
+    let [hint_height, body_height] = [&hint, &body].map(|x|
+        x.line_count(inner_width) as u16
     );
 
-    let Rect{ width: frame_width, height: frame_height, .. } = frame_size;
-    let outer_area = Layout::new()
-        .constraints([Constraint::Min(0)])
-        .horizontal_margin(frame_width.saturating_sub(outer_width) / 2)
-        .vertical_margin(frame_height.saturating_sub(outer_height) / 2)
-        .split(frame_size)[0];
-    let inner_area = block.inner(outer_area);
-    
-    let [body_area, hint_area] = {
-        let layout = Layout::new()
-            .horizontal_margin(HORIZONTAL_MARGIN)
-            .vertical_margin(VERTICAL_MARGIN)
-            .constraints([
-                Constraint::Length(body_height), 
-                Constraint::Min(0), 
-                Constraint::Length(hint_height), 
-            ])
-            .split(inner_area);
-        [layout[0], layout[2]]
+    // draw box and compute its inner area
+    let inner_area = {
+        let inner_height = body_height + hint_height + 1;
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" {} ", title.to_uppercase()))
+            .border_type(BorderType::Thick)
+            .fg(color);
+        let [outer_width, outer_height] = outer_size(
+            &block, 
+            inner_width + HORIZONTAL_MARGIN * 2, 
+            inner_height + VERTICAL_MARGIN * 2, 
+        );
+
+        let Rect{ width: frame_width, height: frame_height, .. } = frame_size;
+        let outer_area = Layout::default()
+            .constraints([Constraint::Min(0)])
+            .horizontal_margin(frame_width.saturating_sub(outer_width) / 2)
+            .vertical_margin(frame_height.saturating_sub(outer_height) / 2)
+            .split(frame_size)[0];
+        let inner_area = block.inner(outer_area);
+
+        frame.render_widget(Clear, outer_area);
+        frame.render_widget(block, outer_area);
+
+        inner_area
     };
-    let [body_widget, hint_widget] = [body, hint].map(|t|
-        Paragraph::new(t).wrap(Wrap{ trim: false })
-    );
 
-    frame.render_widget(Clear, outer_area);
-    frame.render_widget(block, outer_area);
-    frame.render_widget(body_widget, body_area);
-    frame.render_widget(hint_widget, hint_area);
-}
-
-// TODO this doesn't always work
-fn wrapped_height(text: &Text, width: u16) -> u16 {
-    let width = u16::max(width, 1);
-    text.lines.iter()
-        .map(|l| (l.width() as f32 / width as f32).ceil() as u16)
-        .sum()
+    // draw body and hint inside the inner area
+    {
+        let [body_area, hint_area] = {
+            let layout = Layout::default()
+                .horizontal_margin(HORIZONTAL_MARGIN)
+                .vertical_margin(VERTICAL_MARGIN)
+                .constraints([
+                    Constraint::Length(body_height), 
+                    Constraint::Min(0), 
+                    Constraint::Length(hint_height), 
+                ])
+                .split(inner_area);
+            [layout[0], layout[2]]
+        };
+    
+        frame.render_widget(body, body_area);
+        frame.render_widget(hint, hint_area);
+    }
 }
 
 fn outer_size(block: &Block, inner_width: u16, inner_height: u16) -> [u16; 2] {
@@ -307,14 +306,4 @@ fn outer_size(block: &Block, inner_width: u16, inner_height: u16) -> [u16; 2] {
         dummy.height - height, 
     ];
     [inner_width + dx, inner_height + dy]
-}
-
-fn wrap(text: Text, width: u16) -> Text {
-    for line in text.lines {
-        let asdf: String = line
-            .styled_graphemes(Style::default())
-            .map(|StyledGrapheme{ symbol, .. }| symbol)
-            .collect();
-    }
-    todo!()
 }

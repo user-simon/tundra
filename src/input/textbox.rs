@@ -4,7 +4,7 @@ use ratatui::{
     style::{Style, Stylize}
 };
 use crate::prelude::*;
-use super::field::{self, *};
+use super::field::*;
 
 /// An input [field](super::Field) for entering single-line strings. 
 #[derive(Clone, Debug, Default)]
@@ -17,7 +17,7 @@ pub struct Textbox {
     pub hidden: bool, 
     /// The *byte* index of the currently highlighted char. This may differ from the *char* index due to
     /// UTF-8. To maintain this invariance, `caret` and [`value`](Textbox::value) are not directly modifiable
-    /// by user code. 
+    /// by application code. 
     caret: usize, 
 }
 
@@ -198,8 +198,8 @@ impl Field for Textbox {
 
 /// Constructs a [`Textbox`]. 
 /// 
-/// This is used by the [`form`](super::form::form) macro when instantiating [textboxes](Textbox), but may be
-/// used in application code as well. 
+/// This is used by the [form macro](macro@crate::dialog::form) when instantiating [textboxes](Textbox), but
+/// may be used in application code as well. 
 #[derive(Clone, Debug, Default)]
 pub struct Builder(pub Textbox);
 
@@ -222,7 +222,7 @@ impl Builder {
     }
 }
 
-impl field::Build<Textbox> for Builder {
+impl Build<Textbox> for Builder {
     fn build(self) -> Textbox {
         self.0
     }

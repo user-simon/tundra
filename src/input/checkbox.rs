@@ -12,32 +12,6 @@ pub struct Checkbox {
     pub value: bool, 
 }
 
-/// Constructs a [`Checkbox`]. 
-/// 
-/// This is used by the [`form`](super::form::form) macro when instantiating [checkboxes](Checkbox), but may
-/// be used in application code as well. 
-#[derive(Clone, Debug, Default)]
-pub struct Builder(pub Checkbox);
-
-impl Builder {
-    /// The user-visible name displayed by the input field. 
-    pub fn name(self, name: impl Into<Cow<'static, str>>) -> Self {
-        let name = name.into();
-        Builder(Checkbox{ name, ..self.0 })
-    }
-
-    /// The initial value. 
-    pub fn value(self, value: bool) -> Self {
-        Builder(Checkbox{ value, ..self.0 })
-    }
-}
-
-impl Build<Checkbox> for Builder {
-    fn build(self) -> Checkbox {
-        self.0
-    }
-}
-
 impl Field for Checkbox {
     type Value = bool;
     type Builder = Builder;
@@ -64,5 +38,31 @@ impl Field for Checkbox {
 
     fn into_value(self) -> Self::Value {
         self.value
+    }
+}
+
+/// Constructs a [`Checkbox`]. 
+/// 
+/// This is used by the [form macro](macro@crate::dialog::form) when instantiating [checkboxes](Checkbox),
+/// but may be used in application code as well. 
+#[derive(Clone, Debug, Default)]
+pub struct Builder(pub Checkbox);
+
+impl Builder {
+    /// The user-visible name displayed by the input field. 
+    pub fn name(self, name: impl Into<Cow<'static, str>>) -> Self {
+        let name = name.into();
+        Builder(Checkbox{ name, ..self.0 })
+    }
+
+    /// The initial value. 
+    pub fn value(self, value: bool) -> Self {
+        Builder(Checkbox{ value, ..self.0 })
+    }
+}
+
+impl Build<Checkbox> for Builder {
+    fn build(self) -> Checkbox {
+        self.0
     }
 }

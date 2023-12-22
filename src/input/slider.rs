@@ -9,7 +9,7 @@ use ratatui::{
     style::{Style, Stylize}, 
 };
 use crate::prelude::*;
-use super::field::{self, *};
+use super::field::*;
 
 /// An input [field](super::Field) for entering a numerical value. 
 #[derive(Clone, Debug)]
@@ -112,8 +112,8 @@ where
 
 /// Constructs a [`Slider`]. 
 /// 
-/// This is used by the [`form`](super::form::form) macro when instantiating [sliders](Slider), but may be
-/// used in application code as well. 
+/// This is used by the [form macro](macro@crate::dialog::form) when instantiating [sliders](Slider), but may
+/// be used in application code as well. 
 #[derive(Clone, Debug)]
 pub struct Builder<T>(pub Slider<T>);
 
@@ -153,7 +153,7 @@ impl<T> Builder<T> {
     }
 }
 
-impl<T> field::Build<Slider<T>> for Builder<T>
+impl<T> Build<Slider<T>> for Builder<T>
 where
     Slider<T>: Field, 
 {

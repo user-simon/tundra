@@ -36,8 +36,8 @@ pub trait State {
     /// stack. 
     /// 
     /// For brevity, this may be wrapped by functions representing individual states, which provide a more
-    /// bespoke interface. E.g. [`dialog::confirm`](crate::dialog::confirm), which creates a confirm dialog
-    /// state, runs it, and then returns whether the user pressed `y` or `n`. 
+    /// bespoke interface. E.g. [`dialog::confirm`], which creates a confirm dialog state, runs it, and then
+    /// returns whether the user pressed `y` or `n`. 
     /// 
     /// # Returns
     /// - `Some(self)` if [`State::input`] returns [`Signal::Done`]. 
@@ -63,8 +63,8 @@ pub trait State {
 
 /// Trivially implements a no-op [`State`] through `()`. 
 /// 
-/// This is useful when a state is expected but not used; e.g. if you want to display a
-/// [`dialog`](crate::dialog) without a background. 
+/// This is useful when a state is expected but not used; e.g. if you want to display a [`dialog`] without a
+/// background. 
 impl State for () {
     type Error = io::Error;
     type Global = ();

@@ -1,6 +1,49 @@
-/// Shows a form with specified fields in a [`Dialog`](crate::dialog::Dialog) to the user. 
+#![doc(hidden)] 
+
+/// Shows a form with specified [fields](crate::input) in a [dialog](crate::dialog) to the user. 
+/// 
+/// # Examples
+/// To show a login prompt, checking the credentials before proceeding: 
+/// ```no_run
+/// # use std::io;
+/// # use tundra::prelude::*;
+/// # use tundra::input::*;
+/// # let current_state = &();
+/// # let ctx = &mut Context::new().unwrap();
+/// // let current_state = ...
+/// // let ctx = ...
+/// 
+/// let _ = dialog::form!{
+///     username: Textbox{ name: "Username" }, 
+///     password: Textbox{ name: "Password", hidden }, 
+///     [title]: "Login", 
+///     [ctx]: ctx, 
+///     [background]: current_state, 
+///     [validate]: |form| if form.username == "admin" && form.password == "password1" {
+///         Ok(())
+///     } else {
+///         Err("Invalid credentials. Try again.")
+///     }
+/// }?;
+/// # Ok::<(), io::Error>(())
+/// ```
+/// 
+/// # Fields
+/// A field consists of an identifier, a field type, and a set of parameters used when instantiating the
+/// field. 
+/// 
+/// # Required Metadata
+/// In addition to the fields, the following metadata is required in order: 
+/// 1. `[title]`, the user-visible title of the dialog box. 
+/// 1. `[ctx]`, the [context](crate::Context) used by the current (state)[crate::State]. 
+/// 1. `[background]`, the state shown underneath the dialog box. 
+/// 
+/// # (Optional) Validation Function
+/// Optionally, a validation function `[validate]` may be specified as the last piece of meta-data. The
+/// entered user input is validated using this function before the form is closed. If the input fails to
+/// validate, a custom error message is shown before the user is prompted to retry. 
 #[macro_export]
-macro_rules! run_form {
+macro_rules! form {
     {
         // fields
         $(
@@ -49,7 +92,7 @@ macro_rules! run_form {
             fn format_fields(&self) -> ratatui::text::Text {
                 use std::vec::Vec;
                 use ratatui::text::Line;
-                use $crate::input::{Field, form::internal};
+                use $crate::{input::Field, dialog::form::internal};
 
                 type Dispatch = for<'a> fn(&'a __Form<'a>, bool, usize) -> Line<'a>;
 
@@ -119,7 +162,7 @@ macro_rules! run_form {
             }
         }
 
-        impl $crate::input::form::internal::Form for __Form<'_> {
+        impl $crate::dialog::form::internal::Form for __Form<'_> {
             type Values = __Values;
             type BorrowedValues<'a> = __BorrowedValues<'a> where Self: 'a;
     
@@ -161,13 +204,10 @@ macro_rules! run_form {
                 $crate::input::Build::build(builder)
             },)*
         };
-        $crate::input::form::internal::Form::run(__form, $bg, $ctx, __validate)
+        $crate::dialog::form::internal::Form::run(__form, $bg, $ctx, __validate)
     }}
 }
 
-pub use run_form;
-
-#[doc(hidden)]
 pub mod internal {
     use std::{io, iter};
     use ratatui::{
@@ -175,7 +215,6 @@ pub mod internal {
         style::{Style, Stylize}, 
     };
     use crate::{
-        prelude::*, 
         dialog::{self, *}, 
         input::Field, 
     };
@@ -229,6 +268,8 @@ pub mod internal {
     }
 }
 
+pub use form;
+
 #[cfg(test)]
 mod test {
     #[test]
@@ -241,7 +282,7 @@ mod test {
         let bar = 1;
         let name = "123";
 
-        let form = crate::input::run_form!{
+        let form = crate::dialog::form!{
             identifier: crate::input::Textbox{ name: asdf, value: "123    abc 1 😀😀😀1abc" }, 
             len: crate::input::Slider<u8>{ name: "Length" }, 
             salt: crate::input::Slider<u64>{ name: "Salt" }, 

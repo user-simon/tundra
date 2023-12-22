@@ -1,21 +1,27 @@
-//! TODO
+//! Pop-up messages displayed in the middle of the screen, covering some background [state](crate::State). 
+//! 
+//! 
 
-use std::{
-    io, 
-    borrow::Cow, 
-};
+use std::{io, borrow::Cow};
 use ratatui::{
-    style::{Color, Stylize, Style}, 
-    text::{Text, StyledGrapheme}, 
+    Frame, 
+    style::{Color, Stylize}, 
+    text::Text, 
     widgets::*, 
-    prelude::{Rect, Layout, Constraint}
+    layout::{Rect, Layout, Constraint},  
 };
 use crate::prelude::*;
 
+pub mod form;
+mod popup;
+
+pub use form::form;
+pub use popup::*;
+
 /// Content displayed inside a dialog pop-up covering the middle of some background [state](crate::State). 
 /// 
-/// For most applications, the [library provided dialogs](dialog) should suffice, but it is possible to 
-/// create custom dialogs as well. 
+/// For most applications, the [library provided dialogs](dialog) should suffice, but custom dialogs may be
+/// created by implementing this trait. 
 /// 
 /// This essentially serves as a wrapper over [`State`] to provide the rendering of the dialog box and 
 /// background state. 
@@ -23,7 +29,7 @@ use crate::prelude::*;
 /// # Examples
 /// Creating a custom confirmation dialog (this is more or less the same as the one provided through 
 /// [`dialog::confirm`]): 
-/// ```
+/// ```no_run
 /// # use std::io;
 /// # use tundra::{prelude::*, dialog::*};
 /// # use ratatui::style::Color;
@@ -57,19 +63,20 @@ use crate::prelude::*;
 ///         .map(|x| x.is_some())
 /// }
 /// 
-/// # let current_state = ();
-/// # let ctx = &mut Context::new().unwrap();
+/// # let current_state = &();
+/// # let ctx = &mut Context::new()?;
 /// 
 /// // let current_state = ...
 /// // let ctx = ...
 /// 
 /// let msg = "Please confirm before proceeding";
-/// let confirmed = confirm(msg.into(), &current_state, ctx).unwrap();
+/// let confirmed = confirm(msg.into(), current_state, ctx)?;
 /// 
 /// match confirmed {
 ///     true => { /* ... */ }, 
 ///     false => { /* ... */ }, 
 /// }
+/// # Ok::<(), io::Error>(())
 /// ```
 pub trait Dialog: Sized {
     /// Defines the information needed to render. See [`DrawInfo`] for the required fields. 
@@ -89,7 +96,7 @@ pub trait Dialog: Sized {
     }
 }
 
-/// Defines the content displayed within a dialog, and associated meta-data. 
+/// Defines how to render content inside a dialog. 
 /// 
 /// This is interpreted by the dialog state when rendering. 
 #[derive(Clone, Debug)]
@@ -102,44 +109,6 @@ pub struct DrawInfo<'a> {
     pub body: Text<'a>, 
     /// String displayed at the bottom in italics, for example for displaying the dialog key binds. 
     pub hint: Cow<'a, str>,
-}
-
-/// Displays a dialog asking the user to confirm an action before proceeding. 
-/// 
-/// # Returns
-/// `true` if the user pressed `y`. 
-/// `false` if the user pressed `n` or `escape`. 
-pub fn confirm<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) -> io::Result<bool> {
-    Confirm{ msg: msg.as_ref() }
-        .run_over(over, ctx)
-        .map(|x| x.is_some())
-}
-
-/// Displays a dialog showing a message. 
-pub fn info<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) -> io::Result<()> {
-    message(msg.as_ref(), MessageLevel::Info, over, ctx)
-}
-
-/// Displays a dialog showing a warning. 
-pub fn warning<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) -> io::Result<()> {
-    message(msg.as_ref(), MessageLevel::Warning, over, ctx)
-}
-
-/// Displays a dialog showing an error message. 
-pub fn error<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) -> io::Result<()> {
-    message(msg.as_ref(), MessageLevel::Error, over, ctx)
-}
-
-/// Displays a dialog showing a fatal error message. 
-pub fn fatal<G>(msg: impl AsRef<str>, ctx: &mut Context<G>) -> io::Result<()> {
-    message(msg.as_ref(), MessageLevel::Fatal, &(), ctx)
-}
-
-/// Displays a dialog showing a message of specified [level](MessageLevel). 
-fn message<G>(msg: &str, level: MessageLevel, over: &impl State, ctx: &mut Context<G>) -> io::Result<()> {
-    Message{ msg, msg_level: level }
-        .run_over(over, ctx)
-        .map(|_| ())
 }
 
 /// This represents the dialog box and serves as the common [`State`] implementation for all
@@ -167,68 +136,6 @@ impl<T: Dialog, U: State> State for Container<'_, T, U> {
 
     fn input(&mut self, key: KeyEvent, _ctx: &mut Context) -> io::Result<Signal> {
         Ok(self.content.input(key))
-    }
-}
-
-/// Defines the title and colour of a [`Message`] dialog. 
-enum MessageLevel {
-    Info, 
-    Warning, 
-    Error, 
-    Fatal, 
-}
-
-/// Dialog to simply show a message to the user. 
-struct Message<'a> {
-    msg: &'a str, 
-    msg_level: MessageLevel, 
-}
-
-impl Dialog for Message<'_> {
-    fn format(&self) -> DrawInfo {
-        let (title, color) = match self.msg_level {
-            MessageLevel::Info    => ("Info",        Color::Cyan),
-            MessageLevel::Warning => ("Warning",     Color::Yellow),
-            MessageLevel::Error   => ("Error",       Color::Red),
-            MessageLevel::Fatal   => ("Fatal error", Color::Red),
-        };
-        DrawInfo {
-            title: title.into(), 
-            color, 
-            body: self.msg.into(), 
-            hint: "Press any key to continue...".into(),
-        }
-    }
-
-    fn input(&mut self, _key: KeyEvent) -> Signal {
-        Signal::Done
-    }
-}
-
-/// Dialog to confirm an action before proceeding. 
-struct Confirm<'a> {
-    msg: &'a str, 
-}
-
-impl Dialog for Confirm<'_> {
-    fn format(&self) -> DrawInfo {
-        DrawInfo {
-            title: "Confirm".into(),
-            color: Color::Yellow,
-            body: self.msg.into(),
-            hint: "Press (y) to confirm, (n) or (esc) to cancel...".into(),
-        }
-    }
-
-    fn input(&mut self, key: KeyEvent) -> Signal {
-        match key.code {
-            KeyCode::Char('y') |
-            KeyCode::Char('Y') => Signal::Done,
-            KeyCode::Esc       |
-            KeyCode::Char('n') |
-            KeyCode::Char('N') => Signal::Cancelled,
-            _ => Signal::Running,
-        }
     }
 }
 

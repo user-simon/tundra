@@ -1,3 +1,6 @@
+//! Contains simple, mainly informational dialogs like [`dialog::info`](super::dialog::info) and 
+//! [`dialog::confirm`](super::dialog::confirm). 
+
 use std::io;
 use super::*;
 

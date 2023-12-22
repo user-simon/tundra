@@ -7,26 +7,32 @@ use crate::KeyEvent;
 
 /// Interface for builder methods on input fields. 
 /// 
-/// The [`form`](super::form::form) macro uses this interface when instantiating fields. More specifically, 
-/// the DSL `MyField{ foo: bar, baz }` gets (loosely) translated as
-/// `MyField::Builder::default().foo(bar).baz().build()`. 
+/// The [form macro](macro@crate::dialog::form) uses this interface when instantiating fields. More
+/// specifically, the [DSL](https://en.wikipedia.org/wiki/Domain-specific_language)
+/// `MyField{ foo: bar, baz }` gets (loosely) translated as: 
+/// 
+/// ```text
+/// MyField::Builder::default()
+///     .foo(bar)
+///     .baz()
+///     .build()
+/// ```
 pub trait Build<T: Field> {
     /// Constructs and returns the field, consuming the builder. 
     /// 
-    /// For compatibility with the [`form`](super::form::form) macro, this must be infallible. 
+    /// For compatibility with the [form macro](macro@crate::dialog::form), this must be infallible. 
     fn build(self) -> T;
 }
 
-/// Interface for user-input fields like [`Checkbox`](super::checkbox), [`Slider`](super::slider), and
-/// [`Textbox`](super::textbox). 
+/// Interface for user-input fields. 
 /// 
-/// Fields are mainly designed for usage in [forms](super::form::form), but may be used on their own by
-/// feeding key-presses with [`Field::input`] and drawing them using [`FieldWidget`], which implements
+/// Fields are mainly designed for usage in [forms](macro@crate::dialog::form), but may be used on their own
+/// by feeding key-presses with [`Field::input`] and drawing them using [`FieldWidget`], which implements
 /// [`Widget`]. 
 pub trait Field: Sized {
     /// The type of value entered by the user. 
     type Value;
-    /// Points toward the builder type that may be used by the [`form`](super::form::form) macro for
+    /// Points toward the builder type that may be used by the [form macro](macro@crate::dialog::form) for
     /// instantiating fields. 
     type Builder: Build<Self>;
 
@@ -42,6 +48,7 @@ pub trait Field: Sized {
     fn into_value(self) -> Self::Value;
 }
 
+/// TODO
 #[derive(Clone, Copy, Debug)]
 pub struct FieldWidget<'a, T>(pub &'a T);
 

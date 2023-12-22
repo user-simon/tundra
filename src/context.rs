@@ -34,13 +34,14 @@ type Environment = Terminal;
 /// data is necessary, `()` may be used, which is the default. 
 /// 
 /// # Examples
-/// To create a context without global data: 
+/// Creating a context without global data: 
 /// ```
 /// # use tundra::Context;
-/// let context = Context::new().unwrap();
+/// let context = Context::new()?;
+/// # Ok::<(), std::io::Error>(())
 /// ```
 /// 
-/// To create a context with global data: 
+/// Creating a context with global data: 
 /// ```
 /// # use tundra::Context;
 /// struct Config {
@@ -52,7 +53,8 @@ type Environment = Terminal;
 ///     foo: true, 
 ///     bar: "Hello world".into(), 
 /// };
-/// let context = Context::with_global(config).unwrap();
+/// let context = Context::with_global(config)?;
+/// # Ok::<(), std::io::Error>(())
 /// ```
 #[derive(Clone)]
 pub struct Context<G = ()> {
@@ -89,8 +91,9 @@ impl<G> Context<G> {
     /// # Examples
     /// ```
     /// # use tundra::{Context, Terminal};
-    /// let context = Context::new().unwrap();
-    /// let size = context.apply(Terminal::size).unwrap();
+    /// let context = Context::new()?;
+    /// let size = context.apply(Terminal::size)?;
+    /// # Ok::<(), std::io::Error>(())
     /// ```
     pub fn apply<T>(&self, f: impl FnOnce(&Terminal) -> T) -> T {
         let env = self.environment.borrow();
@@ -109,8 +112,9 @@ impl<G> Context<G> {
     /// # Examples
     /// ```
     /// # use tundra::{Context, Terminal};
-    /// let mut context = Context::new().unwrap();
-    /// context.apply_mut(Terminal::clear).unwrap();
+    /// let mut context = Context::new()?;
+    /// context.apply_mut(Terminal::clear)?;
+    /// # Ok::<(), std::io::Error>(())
     /// ```
     pub fn apply_mut<T>(&mut self, f: impl FnOnce(&mut Terminal) -> T) -> T {
         let mut env = self.environment.borrow_mut();

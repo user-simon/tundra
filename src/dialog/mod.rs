@@ -1,6 +1,4 @@
-//! Pop-up messages displayed in the middle of the screen, covering some background [state](crate::State). 
-//! 
-//! 
+//! Dialogs displayed in the middle of the screen, covering some background [state](crate::State). 
 
 use std::{io, borrow::Cow};
 use ratatui::{

@@ -1,4 +1,18 @@
 //! Dialogs displayed in the middle of the screen, covering some background [state](crate::State). 
+//! 
+//! The following dialogs are defined in this module: 
+//! - [`dialog::confirm`] asks the user to confirm an action before proceeding. 
+//! - [`dialog::info`] displays a message. 
+//! - [`dialog::warning`] displays a warning. 
+//! - [`dialog::error`] displays an error. 
+//! - [`dialog::fatal`] displays a fatal error. 
+//! - [`dialog::form!`] allows the user to enter information through a set of input fields. 
+//! 
+//! 
+//! # Custom dialogs
+//! 
+//! Custom dialogs may be created by implementing the [`Dialog`] trait. See its documentation for more
+//! information. 
 
 use std::{io, borrow::Cow};
 use ratatui::{
@@ -28,9 +42,10 @@ pub use popup::*;
 /// Creating a custom confirmation dialog (this is more or less the same as the one provided through 
 /// [`dialog::confirm`]): 
 /// ```no_run
-/// # use std::io;
-/// # use tundra::{prelude::*, dialog::*};
-/// # use ratatui::style::Color;
+/// use std::io;
+/// use ratatui::style::Color;
+/// use tundra::{prelude::*, dialog::*};
+/// 
 /// struct Confirm {
 ///     msg: String, 
 /// }
@@ -63,9 +78,8 @@ pub use popup::*;
 /// 
 /// # let current_state = &();
 /// # let ctx = &mut Context::new()?;
-/// 
-/// // let current_state = ...
-/// // let ctx = ...
+/// // let current_state: &impl State
+/// // let ctx: &mut Context<_>
 /// 
 /// let msg = "Please confirm before proceeding";
 /// let confirmed = confirm(msg.into(), current_state, ctx)?;
@@ -206,9 +220,7 @@ fn draw_dialog(info: DrawInfo, frame: &mut Frame) {
 fn outer_size(block: &Block, inner_width: u16, inner_height: u16) -> [u16; 2] {
     let dummy = Rect::new(0, 0, u16::MAX, u16::MAX);
     let Rect{ width, height, .. } = block.inner(dummy);
-    let [dx, dy] = [
-        dummy.width - width, 
-        dummy.height - height, 
-    ];
+    let dx = dummy.width - width;
+    let dy = dummy.height - height;
     [inner_width + dx, inner_height + dy]
 }

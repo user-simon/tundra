@@ -1,11 +1,20 @@
-//! Contains simple, mainly informational dialogs like [`dialog::info`] and [`dialog::confirm`]. 
+//! Defines simple, mainly informational dialogs. 
+//! 
+//! The following dialogs are defined in this module: 
+//! - [`dialog::confirm`] asks the user to confirm an action before proceeding. 
+//! - [`dialog::info`] displays a message. 
+//! - [`dialog::warning`] displays a warning. 
+//! - [`dialog::error`] displays an error. 
+//! - [`dialog::fatal`] displays a fatal error. 
 
 use std::io;
 use super::*;
 
-/// Displays a dialog asking the user to confirm an action before proceeding. 
+/// Displays a yellow dialog asking the user to confirm an action before proceeding. 
+/// 
 /// 
 /// # Returns
+/// 
 /// - `true` if the user pressed `y`. 
 /// - `false` if the user pressed `n` or `escape`. 
 pub fn confirm<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) -> io::Result<bool> {
@@ -14,22 +23,24 @@ pub fn confirm<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>)
         .map(|x| x.is_some())
 }
 
-/// Displays a dialog showing a message. 
+/// Displays a blue dialog showing a message. 
 pub fn info<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) -> io::Result<()> {
     message(msg.as_ref(), MessageLevel::Info, over, ctx)
 }
 
-/// Displays a dialog showing a warning. 
+/// Displays a yellow dialog showing a warning. 
 pub fn warning<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) -> io::Result<()> {
     message(msg.as_ref(), MessageLevel::Warning, over, ctx)
 }
 
-/// Displays a dialog showing an error message. 
+/// Displays a red dialog showing an error message. 
 pub fn error<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) -> io::Result<()> {
     message(msg.as_ref(), MessageLevel::Error, over, ctx)
 }
 
-/// Displays a dialog showing a fatal error message. 
+/// Displays a red dialog showing a fatal error message. 
+/// 
+/// No background state is drawn upon displaying a fatal error message. 
 pub fn fatal<G>(msg: impl AsRef<str>, ctx: &mut Context<G>) -> io::Result<()> {
     message(msg.as_ref(), MessageLevel::Fatal, &(), ctx)
 }

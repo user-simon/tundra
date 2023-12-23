@@ -17,6 +17,7 @@ pub use crate::{
 };
 
 pub mod prelude {
+    #[doc(no_inline)]
     pub use super::{
         dialog, 
         KeyCode, KeyEvent, KeyModifiers, Frame, 

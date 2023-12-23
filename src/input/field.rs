@@ -9,12 +9,12 @@ use crate::KeyEvent;
 /// 
 /// The [form macro](macro@crate::dialog::form) uses this interface when instantiating fields. More
 /// specifically, the [DSL](https://en.wikipedia.org/wiki/Domain-specific_language)
-/// `MyField{ foo: bar, baz }` gets (loosely) translated as: 
+/// `Textbox{ name: "Password", hidden }` gets (loosely) translated as: 
 /// 
 /// ```text
-/// MyField::Builder::default()
-///     .foo(bar)
-///     .baz()
+/// Textbox::Builder::default()
+///     .name("Password")
+///     .hidden()
 ///     .build()
 /// ```
 pub trait Build<T: Field> {

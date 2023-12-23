@@ -20,7 +20,7 @@ use ratatui::{
     style::{Color, Stylize}, 
     text::Text, 
     widgets::*, 
-    layout::{Rect, Layout, Constraint},  
+    layout::{Rect, Layout, Constraint}, 
 };
 use crate::prelude::*;
 

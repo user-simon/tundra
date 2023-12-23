@@ -39,7 +39,9 @@ pub trait State {
     /// bespoke interface. E.g. [`dialog::confirm`], which creates a confirm dialog state, runs it, and then
     /// returns whether the user pressed `y` or `n`. 
     /// 
+    /// 
     /// # Returns
+    /// 
     /// - `Some(self)` if [`State::input`] returns [`Signal::Done`]. 
     /// - `None` if [`State::input`] returns [`Signal::Cancelled`]. 
     fn run(mut self, ctx: &mut Context<Self::Global>) -> Result<Option<Self>, Self::Error>

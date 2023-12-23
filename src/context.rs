@@ -33,7 +33,9 @@ type Environment = Terminal;
 /// context for all states ran with it. Note that this is purely opt-in; for applications where no global 
 /// data is necessary, `()` may be used, which is the default. 
 /// 
+/// 
 /// # Examples
+/// 
 /// Creating a context without global data: 
 /// ```
 /// # use tundra::Context;

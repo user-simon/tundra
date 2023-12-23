@@ -1,23 +1,133 @@
-#![doc(hidden)] 
+#![doc(hidden)]
 
-/// Shows a form with specified [fields](crate::input) in a [dialog](crate::dialog) to the user. 
+/// Displays a user input form with specified [fields](crate::input) in a [dialog](crate::dialog) to the
+/// user. 
+/// 
+/// The easiest way to get a hang of how to use the macro is to just examine the [examples](#examples), but a
+/// (somewhat) more formal description of the syntax is provided as well. 
+/// 
+/// The syntax expects first a set of fields, followed by a set of required metadata. The items should be
+/// comma-separated (trailing commas are optional). 
+/// 
+/// 
+/// # Fields
+/// 
+/// A field consists of:
+/// - An identifier; used to reference the entered value after the form has been submitted by the user. 
+/// - A field type; any type that implements [`Field`](crate::input::Field). 
+/// - A set of parameters used when instantiating the field; these are translated into methods on the
+/// [field builder](crate::input::Build). There are two kinds of parameters: those with one argument and
+/// those with none. Those with one argument are specified as `IDENTIFIER: VALUE`. Those with no argument are
+/// specified simply as `IDENTIFIER`. 
+/// 
+/// The syntax for declaring a field follows the form: `IDENTIFIER: TYPE{ PARAMS }`. For example, to declare
+/// a textbox with identifier `password`, and with parameters `name = "Password"` (one argument) and `hidden`
+/// (no argument): 
+/// 
+/// ```text
+/// password: Textbox{ name: "Password", hidden }, 
+/// ```
+/// 
+/// The DSL `Textbox{ name: "Password", hidden }` gets (loosely) translated as: 
+/// 
+/// ```text
+/// Textbox::Builder::default()
+///     .name("Password")
+///     .hidden()
+///     .build()
+/// ```
+/// 
+/// 
+/// # Required Metadata
+/// 
+/// In addition to the fields, the following metadata is required (in order): 
+/// 1. `title`; the user-visible title of the dialog box. Should be `impl Into<Cow<'_, str>>`. 
+/// 2. `context`; the current [context](crate::Context). Should be `&mut Context<_>`. 
+/// 3. `background`; the state shown underneath the dialog box. Should be `&impl State`. 
+/// 
+/// The syntax for providing a piece of meta-data follows the form `[IDENTIFIER]: VALUE`. For example, to
+/// provide the title of the form as `"My form"`: 
+/// 
+/// ```text
+/// [title]: "My form", 
+/// ```
+/// 
+/// 
+/// # (Optional) Validation Function
+/// 
+/// Optionally, a validation function may be specified as the last piece of metadata. The entered user input
+/// is validated using this function before the form may be submitted. If the input fails to validate, a
+/// given error message is shown before the user is prompted to retry. 
+/// 
+/// The validation function accepts as argument a struct containing a reference to the values of all fields. 
+/// Since this struct is unspellable by application code, the function must be a closure. 
+/// 
+/// The validation function should return a value of `Result<(), impl AsRef<str>>`. On succeess, `Ok(())`
+/// should be returned, indicating that the entered values were valid. On failure, `Err` should be returned
+/// with the error message that is to be displayed to the user. 
+/// 
+/// The syntax for declaring a validation function follows the form `[validate]: |IDENTIFIER| EXPRESSION`. 
+/// For example, to validate that a slider `foo`'s value is non-zero: 
+/// 
+/// ```text
+/// [validate]: |form| if *form.foo == 0 {
+///     Err("Foo must be non-zero!")
+/// } else {
+///     Ok(())
+/// }
+/// ```
+/// 
+/// 
+/// # Returns
+/// 
+/// The return value of the macro is an [`Option`]: 
+/// - `Some` if the form was submitted. Contains the values of all fields as members of an
+/// unspellable struct. The identifiers of the values are the same as the corresponding fields. 
+/// - `None` if the form was cancelled. 
+/// 
 /// 
 /// # Examples
-/// To show a login prompt, checking the credentials before proceeding: 
+/// 
 /// ```no_run
-/// # use std::io;
-/// # use tundra::prelude::*;
-/// # use tundra::input::*;
+/// use tundra::{prelude::*, input::*};
+/// 
 /// # let current_state = &();
 /// # let ctx = &mut Context::new().unwrap();
-/// // let current_state = ...
-/// // let ctx = ...
+/// // let current_state: &impl State
+/// // let ctx: &mut Context<_>
 /// 
-/// let _ = dialog::form!{
+/// let form = dialog::form!{
+///     foo: Textbox{ name: "Foo" }, 
+///     bar: Slider<f32>{ name: "Bar", step: 0.25, min: 0.0, max: 2.0 }, 
+///     baz: Checkbox{ name: "Baz" }, 
+///     [title]: "Here's a form!", 
+///     [context]: ctx, 
+///     [background]: current_state, 
+/// }?;
+/// if let Some(form) = form {
+///     let foo: String = form.foo;
+///     let bar: f32 = form.bar;
+///     let baz: bool = form.baz;
+/// }
+/// # Ok::<(), std::io::Error>(())
+/// ```
+/// 
+/// 
+/// To show a login prompt, checking the credentials before proceeding: 
+/// 
+/// ```no_run
+/// use tundra::{prelude::*, input::*};
+/// 
+/// # let current_state = &();
+/// # let ctx = &mut Context::new().unwrap();
+/// // let current_state: &impl State
+/// // let ctx: &mut Context<_>
+/// 
+/// let form = dialog::form!{
 ///     username: Textbox{ name: "Username" }, 
 ///     password: Textbox{ name: "Password", hidden }, 
 ///     [title]: "Login", 
-///     [ctx]: ctx, 
+///     [context]: ctx, 
 ///     [background]: current_state, 
 ///     [validate]: |form| if form.username == "admin" && form.password == "password1" {
 ///         Ok(())
@@ -25,39 +135,32 @@
 ///         Err("Invalid credentials. Try again.")
 ///     }
 /// }?;
-/// # Ok::<(), io::Error>(())
+/// match form {
+///     Some(_) => { /* form submitted -> login success */ }
+///     None => { /* form cancelled -> login failure */ }
+/// }
+/// # Ok::<(), std::io::Error>(())
 /// ```
-/// 
-/// # Fields
-/// A field consists of an identifier, a field type, and a set of parameters used when instantiating the
-/// field. 
-/// 
-/// # Required Metadata
-/// In addition to the fields, the following metadata is required in order: 
-/// 1. `[title]`, the user-visible title of the dialog box. 
-/// 1. `[ctx]`, the [context](crate::Context) used by the current (state)[crate::State]. 
-/// 1. `[background]`, the state shown underneath the dialog box. 
-/// 
-/// # (Optional) Validation Function
-/// Optionally, a validation function `[validate]` may be specified as the last piece of meta-data. The
-/// entered user input is validated using this function before the form is closed. If the input fails to
-/// validate, a custom error message is shown before the user is prompted to retry. 
 #[macro_export]
 macro_rules! form {
     {
-        // fields
+        // A comma-separated list of fields
         $(
             $id:ident: $type:ty {
+                // Parameters for each field using builder pattern methods
                 $(
                     $arg_id:ident $(: $arg_val:expr)?
                 ),+
                 $(,)?
             }
-        ),+
-        $(,)?, 
+        ),+, 
+        // User-visible title of the dialog box. Should be `impl Into<Cow<'_, str>>`
         [title]: $title:expr, 
-        [ctx]: $ctx:expr, 
+        // Current context. Should be `&mut Context<_>`
+        [context]: $ctx:expr, 
+        // State shown underneath the dialog box. Should be `&impl State`
         [background]: $bg:expr
+        // Function to validate the entered values. Should return `Result<(), impl AsRef<str>>`
         $(, [validate]: |$form_id:ident| $validate:expr)?
         $(,)?
     } => {{
@@ -204,7 +307,7 @@ macro_rules! form {
                 $crate::input::Build::build(builder)
             },)*
         };
-        $crate::dialog::form::internal::Form::run(__form, $bg, $ctx, __validate)
+        $crate::dialog::form::internal::Form::run_over(__form, $bg, $ctx, __validate)
     }}
 }
 
@@ -226,7 +329,7 @@ pub mod internal {
         fn into_values(self) -> Self::Values;
         fn values<'a>(&'a self) -> Self::BorrowedValues<'a>;
 
-        fn run<G, T, U, V>(mut self, bg: &T, ctx: &mut Context<G>, mut validate: U)
+        fn run_over<G, T, U, V>(mut self, bg: &T, ctx: &mut Context<G>, mut validate: U)
             -> io::Result<Option<Self::Values>>
         where
             Self: Dialog, 
@@ -272,32 +375,5 @@ pub use form;
 
 #[cfg(test)]
 mod test {
-    #[test]
-    fn foo() {
-        let mut ctx = crate::context::Context::new().unwrap();
-        let ctx = &mut ctx;
-        let bg = &();
-
-        let asdf = "Identifier";
-        let bar = 1;
-        let name = "123";
-
-        let form = crate::dialog::form!{
-            identifier: crate::input::Textbox{ name: asdf, value: "123    abc 1 😀😀😀1abc" }, 
-            len: crate::input::Slider<u8>{ name: "Length" }, 
-            salt: crate::input::Slider<u64>{ name: "Salt" }, 
-            description: crate::input::Textbox{ name: "Description", hidden }, 
-            asdf: crate::input::Checkbox{ name: "Checkbox" }, 
-            [title]: format!("-- {name} --"), 
-            [ctx]: ctx, 
-            [background]: bg, 
-            [validate]: |f| {
-                if f.len == &bar {
-                    Err(format!("Length must not be equal to {bar}."))
-                } else {
-                    Ok(())
-                }
-            }
-        };
-    }
+    
 }

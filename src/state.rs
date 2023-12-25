@@ -24,40 +24,38 @@ pub trait State {
     fn draw(&self, frame: &mut Frame);
     
     /// Update the state with a key press input. 
+    /// 
+    /// This is called by the default implementation of [`State::event`] when a key input event is read. 
     fn input(&mut self, key: KeyEvent, ctx: &mut Context<Self::Global>) -> Result<Signal, Self::Error>;
+
+    /// Update the state with an event. 
+    /// 
+    /// This is called by the default implementation of [`State::run`] when an event is read. 
+    /// 
+    /// The default implementation of this function simply delegates to [`State::input`], representing the
+    /// most common use case. All other events are discarded. 
+    fn event(&mut self, event: Event, ctx: &mut Context<Self::Global>) -> Result<Signal, Self::Error> {
+        if let Event::Key(key_event) = event {
+            self.input(key_event, ctx)
+        } else {
+            Ok(Signal::Running)
+        }
+    }
 
     /// The event loop. 
     /// 
-    /// Calls [`State::draw`] and [`State::input`] until the latter returns [`Signal::Done`] or
+    /// Calls [`State::draw`] and [`State::event`] until the latter returns [`Signal::Done`] or
     /// [`Signal::Cancelled`]. 
-    /// 
-    /// Should be called recursively for state transtitions; e.g. `<A as State>::input` may call
-    /// `<B as State>::run` to transition to the `B` state, thereby preserving the state history on the call
-    /// stack. 
-    /// 
-    /// For brevity, this may be wrapped by functions representing individual states, which provide a more
-    /// bespoke interface. E.g. [`dialog::confirm`], which creates a confirm dialog state, runs it, and then
-    /// returns whether the user pressed `y` or `n`. 
-    /// 
-    /// 
-    /// # Returns
-    /// 
-    /// - `Some(self)` if [`State::input`] returns [`Signal::Done`]. 
-    /// - `None` if [`State::input`] returns [`Signal::Cancelled`]. 
-    fn run(mut self, ctx: &mut Context<Self::Global>) -> Result<Option<Self>, Self::Error>
-    where
-        Self: Sized, 
-        Self::Error: From<io::Error>, 
-    {
+    fn run(mut self, ctx: &mut Context<Self::Global>) -> Result<Option<Self>, Self::Error> {
         loop {
             ctx.draw_state(&self)?;
 
-            if let Event::Key(key_event) = event::read()? {
-                match self.input(key_event, ctx)? {
-                    Signal::Done      => break Ok(Some(self)),
-                    Signal::Cancelled => break Ok(None),
-                    Signal::Running   => (),
-                }
+            let event = event::read()?;
+            
+            match self.event(event, ctx)? {
+                Signal::Done      => break Ok(Some(self)),
+                Signal::Cancelled => break Ok(None),
+                Signal::Running   => (),
             }
         }
     }

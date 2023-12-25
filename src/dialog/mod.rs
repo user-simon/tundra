@@ -13,6 +13,18 @@
 //! 
 //! Custom dialogs may be created by implementing the [`Dialog`] trait. See its documentation for more
 //! information. 
+//! 
+//! 
+//! # Examples
+//! 
+//! To show a dialog without any background, provide the [dummy state](crate::State#dummy-state) `()`: 
+//! ```no_run
+//! # use tundra::dialog;
+//! # let ctx = &mut tundra::Context::new().unwrap();
+//! // let ctx: &mut Context<_>
+//! dialog::info("Shown without a background!", &(), ctx)?;
+//! # Ok::<(), std::io::Error>(())
+//! ```
 
 use std::{io, borrow::Cow};
 use ratatui::{
@@ -91,7 +103,7 @@ pub use popup::*;
 /// # Ok::<(), io::Error>(())
 /// ```
 pub trait Dialog: Sized {
-    /// Defines the information needed to render. See [`DrawInfo`] for the required fields. 
+    /// Defines the information needed to draw the dialog. See [`DrawInfo`] for the required fields. 
     fn format(&self) -> DrawInfo;
     
     /// Update the dialog with a key press input. 
@@ -110,7 +122,7 @@ pub trait Dialog: Sized {
 
 /// Defines how to render content inside a dialog. 
 /// 
-/// This is interpreted by the dialog state when rendering. 
+/// This is interpreted by the dialog state when drawing. 
 #[derive(Clone, Debug)]
 pub struct DrawInfo<'a> {
     /// User-visible title of the dialog box. 

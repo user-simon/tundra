@@ -23,15 +23,39 @@ type Environment = Terminal;
 /// - Hiding the cursor. 
 /// - Entering an alternate terminal buffer. 
 /// 
-/// The installed panic handler will delegate to the previous one after resetting the terminal. If a custom
-/// panic handler is used in the application, it should be installed *before* creating the context to ensure
-/// compatability. 
+/// 
+/// # Application-defined Global
 /// 
 /// In addition to managing the terminal environment, the context also provides the utility of a global 
 /// value, which can be whatever makes sense in the application. Suitable examples include configuration 
-/// data or user information. This will then available via the [`global`](Context::global) field of the 
-/// context for all states ran with it. Note that this is purely opt-in; for applications where no global 
-/// data is necessary, `()` may be used, which is the default. 
+/// data or user information. The global will then available via the [`global`](Context::global) field of the 
+/// context for all states ran with it. 
+/// 
+/// Note that this is purely opt-in; for applications where no global data is necessary, `()` may be used, 
+/// which is the default. 
+/// 
+/// To use a context global, construct the context using [`Context::with_global`] and set the
+/// [`Global`](crate::State::Global) type of all states ran with the context equal to the type of the global. 
+/// 
+/// 
+/// # Chaining With New Globals
+/// 
+/// Though globals should generally persist across an entire application, there is support for creating a
+/// "new" context with a new global value, while reusing the same internal [`Terminal`] handle. This is
+/// achieved through _chaining_ using [`Context::chain_with_global`] or [`Context::chain_without_global`]. 
+/// 
+/// Chaining may be useful where there are distinct clusters of states in an application, with each cluster
+/// having its own associated global. 
+/// 
+/// ⚠️ Creating several context instances using [`Context::new`] or [`Context::with_global`] should generally be
+/// avoided. 
+/// 
+/// 
+/// # Custom Panic Handler
+/// 
+/// The installed panic handler will delegate to the previous one after resetting the terminal. If a custom
+/// panic handler is used in the application, it should be installed *before* creating the context to ensure
+/// compatability. 
 /// 
 /// 
 /// # Examples
@@ -60,7 +84,11 @@ type Environment = Terminal;
 /// ```
 #[derive(Clone)]
 pub struct Context<G = ()> {
+    /// Application-defined global value. See the [context documentation](Context#application-defined-global)
+    /// for more information. 
     pub global: G, 
+    /// A reference to the RAII wrapper over the terminal environment. This is reference-counted to allow for
+    /// [chaining](Context#chaining-with-new-globals). 
     environment: Rc<RefCell<Environment>>, 
 }
 
@@ -93,8 +121,9 @@ impl<G> Context<G> {
     /// # Examples
     /// ```
     /// # use tundra::{Context, Terminal};
-    /// let context = Context::new()?;
-    /// let size = context.apply(Terminal::size)?;
+    /// # let ctx = Context::new().unwrap();
+    /// // let ctx: &Context<_>
+    /// let size = ctx.apply(Terminal::size)?;
     /// # Ok::<(), std::io::Error>(())
     /// ```
     pub fn apply<T>(&self, f: impl FnOnce(&Terminal) -> T) -> T {
@@ -114,8 +143,9 @@ impl<G> Context<G> {
     /// # Examples
     /// ```
     /// # use tundra::{Context, Terminal};
-    /// let mut context = Context::new()?;
-    /// context.apply_mut(Terminal::clear)?;
+    /// # let mut ctx = Context::new().unwrap();
+    /// // let ctx: &mut Context<_>
+    /// ctx.apply_mut(Terminal::clear)?;
     /// # Ok::<(), std::io::Error>(())
     /// ```
     pub fn apply_mut<T>(&mut self, f: impl FnOnce(&mut Terminal) -> T) -> T {
@@ -203,6 +233,8 @@ mod managed {
     /// - Hides the cursor. 
     /// - Enters an alternate terminal buffer. 
     fn init() -> io::Result<Terminal> {
+        // this guard ensures that the panic handler is not installed multiple times, even if the user (for
+        // whatever reason) creates multiple context instances with `Context::new` or `Context::with_global`
         static PANIC_HOOKED: AtomicBool = AtomicBool::new(false);
 
         let backend = Backend::new(io::stdout());

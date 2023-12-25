@@ -13,14 +13,93 @@ pub enum Signal {
 }
 
 /// Defines the event loop of an application state. 
-pub trait State {
-    type Error;
+/// 
+/// 
+/// # Usage 
+/// 
+/// The event loop is entered by calling [`State::run`]. 
+/// 
+/// Key input events are handled from [`State::input`], representing the most common use case. If other
+/// events are needed, [`State::event`] may be implemented --- whose default implementation simply delegates
+/// key input events to [`State::input`] and discards the rest. 
+/// 
+/// The state is drawn from [`State::draw`]. See [Ratatui's documentation](ratatui) on how to construct and
+/// render widgets. 
+/// 
+/// The interface provided by [`State::run`] is fairly low-level. In most cases, a wrapper function may be
+/// used to provide a more bespoke interface. E.g., [`dialog::confirm`], which creates a confirm dialog
+/// state, runs it, and then returns whether the user pressed `y` or `n`. 
+/// 
+/// 
+/// # Dummy State
+/// 
+/// A dummy (or no-nop) state is implemented through `()`. This is useful when a state is expected but not
+/// used; e.g. to display a [`dialog`] without a background. 
+/// 
+/// The dummy state draws nothing and exits as soon as a key is pressed. 
+/// 
+/// 
+/// # Returns
+/// 
+/// A state "returns" when [`State::run`] returns:  
+/// 
+/// - `Some(self)` if the state exits with [`Signal::Done`]. 
+/// - `None` if the state exits with [`Signal::Cancelled`]. 
+/// 
+/// 
+/// # Examples 
+/// 
+/// To create a state 
+/// ```no_run
+/// use std::io;
+/// use ratatui::widgets::Paragraph;
+/// use tundra::prelude::*;
+/// 
+/// struct MyState {
+///     counter: i32, 
+/// }
+/// 
+/// impl State for MyState {
+///     type Error = io::Error;
+///     type Global = ();
+/// 
+///     fn draw(&self, frame: &mut Frame) {
+///         let counter_string = format!("{}", self.counter);
+///         let widget = Paragraph::new(counter_string);
+///         frame.render_widget(widget, frame.size());
+///     }
+/// 
+///     fn input(&mut self, key: KeyEvent, ctx: &mut Context) -> io::Result<Signal> {
+///         match key.code {
+///             KeyCode::Up    => self.counter += 1, 
+///             KeyCode::Down  => self.counter -= 1, 
+///             KeyCode::Enter => return Ok(Signal::Done), 
+///             KeyCode::Esc   => return Ok(Signal::Cancelled), 
+///             _ => (), 
+///         }
+///         Ok(Signal::Running)
+///     }
+/// }
+/// 
+/// // wrapper function that constructs the state, runs it, and returns the entered value
+/// pub fn run_my_state(ctx: &mut Context) -> io::Result<Option<i32>> {
+///     let value = MyState{ counter: 0 }
+///         .run(ctx)?
+///         .map(|state| state.counter);
+///     Ok(value)
+/// }
+/// ```
+pub trait State: Sized {
+    /// 
+    type Error: From<io::Error>;
 
     /// Type of the application-defined global inside [`Context`]. This should be set to the same type as the
     /// one used when initializing the [`Context`]. If no global is used, this may be set to `()`. 
     type Global;
 
     /// Draw the state to a [`Frame`]. 
+    /// 
+    /// See [Ratatui's documentation](ratatui) for how to construct and render widgets. 
     fn draw(&self, frame: &mut Frame);
     
     /// Update the state with a key press input. 
@@ -61,7 +140,7 @@ pub trait State {
     }
 }
 
-/// Trivially implements a no-op [`State`] through `()`. 
+/// Implements a dummy (or no-op) [`State`] through `()`. 
 /// 
 /// This is useful when a state is expected but not used; e.g. if you want to display a [`dialog`] without a
 /// background. 

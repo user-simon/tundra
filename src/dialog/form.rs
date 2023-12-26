@@ -41,7 +41,7 @@
 /// # Required Metadata
 /// 
 /// In addition to the fields, the following metadata is required (in order): 
-/// 1. `title`; the user-visible title of the dialog box. Should be `impl Into<Cow<'_, str>>`. 
+/// 1. `title`; the user-visible title of the dialog box. Should be `impl Into<Cow<str>>`. 
 /// 2. `context`; the current [context](crate::Context). Should be `&mut Context<_>`. 
 /// 3. `background`; the state shown underneath the dialog box. Should be `&impl State`. 
 /// 
@@ -154,7 +154,7 @@ macro_rules! form {
                 $(,)?
             }
         ),+, 
-        // User-visible title of the dialog box. Should be `impl Into<Cow<'_, str>>`
+        // User-visible title of the dialog box. Should be `impl Into<Cow<str>>`
         [title]: $title:expr, 
         // Current context. Should be `&mut Context<_>`
         [context]: $ctx:expr, 

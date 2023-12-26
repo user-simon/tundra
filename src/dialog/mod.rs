@@ -58,7 +58,7 @@ pub use popup::*;
 /// ```no_run
 /// use std::io;
 /// use ratatui::style::Color;
-/// use tundra::{prelude::*, dialog::*};
+/// use tundra::{prelude::*, dialog::{Dialog, DrawInfo}};
 /// 
 /// struct Confirm {
 ///     msg: String, 
@@ -97,12 +97,7 @@ pub use popup::*;
 /// // let ctx: &mut Context<_>
 /// 
 /// let msg = "Please confirm before proceeding";
-/// let confirmed = confirm(msg.into(), current_state, ctx)?;
-/// 
-/// match confirmed {
-///     true => { /* ... */ }, 
-///     false => { /* ... */ }, 
-/// }
+/// let confirmed: bool = confirm(msg.into(), current_state, ctx)?;
 /// # Ok::<(), io::Error>(())
 /// ```
 pub trait Dialog: Sized {
@@ -127,18 +122,19 @@ pub trait Dialog: Sized {
 /// 
 /// This is returned from [`Dialog::format`] and is interpreted by the dialog state when drawing. 
 /// 
-/// Note that most (though not all) variables used when
-/// drawing dialogs are factored out in this struct for flexibility --- many of which are likely not relevant
-/// for most dialogs. In these cases, set the required variables and defer to the default implementation for
-/// the remainder. 
+/// Note that most (though not all) variables used when drawing dialogs are factored out in this struct for
+/// flexibility --- many of which are likely not relevant for most dialogs. In these cases, set the required
+/// variables and defer to the default implementation for the remainder. 
 /// 
 /// 
 /// # Examples
 /// 
-/// To draw a red dialog with title "Attention!", body "You are an ugly boy.", and hint
-/// "Press any key to accept...": 
+/// To draw a red dialog with title "Attention!", body "You are an ugly boy.", and hint "Press any key to
+/// accept...": 
 /// ```no_run
+/// # use ratatui::style::Color;
 /// # use tundra::dialog::DrawInfo;
+/// # let _ = 
 /// DrawInfo {
 ///     title: "Attention!".into(), 
 ///     color: Color::Red, 
@@ -146,6 +142,8 @@ pub trait Dialog: Sized {
 ///     hint: "Press any key to accept...".into(), 
 ///     ..Default::default()
 /// }
+/// # ;
+/// ```
 #[derive(Clone, Debug)]
 pub struct DrawInfo<'a> {
     /// User-visible title of the dialog box. Default: `""`. 

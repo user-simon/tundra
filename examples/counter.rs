@@ -17,8 +17,8 @@ impl State for Counter {
     
     fn input(&mut self, key: KeyEvent, ctx: &mut Context) -> io::Result<Signal> {
         match key.code {
-            KeyCode::Up  => self.value += 1, 
-            KeyCode::Tab => self.value += counter(ctx)?, 
+            KeyCode::Up    => self.value += 1, 
+            KeyCode::Tab   => self.value += counter(ctx)?, 
             KeyCode::Enter => return Ok(Signal::Done), 
             KeyCode::Esc   => return Ok(Signal::Cancelled), 
             _ => (), 
@@ -27,7 +27,7 @@ impl State for Counter {
     }
 }
 
-fn counter(ctx: &mut Context) -> io::Result<u32> {
+pub fn counter(ctx: &mut Context) -> io::Result<u32> {
     let counter = Counter{ value: 0 }.run(ctx)?;
     let value = counter
         .map(|c| c.value)

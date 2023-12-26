@@ -258,9 +258,9 @@ macro_rules! form {
 
                 DrawInfo {
                     title: self.__title.as_ref().into(), 
-                    color: Color::Cyan, 
                     body: self.format_fields(), 
                     hint: "Press (enter) to submit, (esc) to cancel...".into(), 
+                    ..Default::default()
                 }
             }
         }

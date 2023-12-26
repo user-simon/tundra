@@ -69,16 +69,17 @@ struct Message<'a> {
 impl Dialog for Message<'_> {
     fn format(&self) -> DrawInfo {
         let (title, color) = match self.msg_level {
-            MessageLevel::Info    => ("Info",        Color::Cyan),
-            MessageLevel::Warning => ("Warning",     Color::Yellow),
-            MessageLevel::Error   => ("Error",       Color::Red),
-            MessageLevel::Fatal   => ("Fatal error", Color::Red),
+            MessageLevel::Info    => ("Info",        Color::Cyan), 
+            MessageLevel::Warning => ("Warning",     Color::Yellow), 
+            MessageLevel::Error   => ("Error",       Color::Red), 
+            MessageLevel::Fatal   => ("Fatal error", Color::Red), 
         };
         DrawInfo {
             title: title.into(), 
             color, 
             body: self.msg.into(), 
-            hint: "Press any key to continue...".into(),
+            hint: "Press any key to continue...".into(), 
+            ..Default::default()
         }
     }
 
@@ -95,21 +96,22 @@ struct Confirm<'a> {
 impl Dialog for Confirm<'_> {
     fn format(&self) -> DrawInfo {
         DrawInfo {
-            title: "Confirm".into(),
-            color: Color::Yellow,
-            body: self.msg.into(),
-            hint: "Press (y) to confirm, (n) or (esc) to cancel...".into(),
+            title: "Confirm".into(), 
+            color: Color::Yellow, 
+            body: self.msg.into(), 
+            hint: "Press (y) to confirm, (n) or (esc) to cancel...".into(), 
+            ..Default::default()
         }
     }
 
     fn input(&mut self, key: KeyEvent) -> Signal {
         match key.code {
             KeyCode::Char('y') |
-            KeyCode::Char('Y') => Signal::Done,
+            KeyCode::Char('Y') => Signal::Done, 
             KeyCode::Esc       |
             KeyCode::Char('n') |
-            KeyCode::Char('N') => Signal::Cancelled,
-            _ => Signal::Running,
+            KeyCode::Char('N') => Signal::Cancelled, 
+            _ => Signal::Running, 
         }
     }
 }

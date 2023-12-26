@@ -17,6 +17,18 @@ required to draw the user interface of each application state, and the backend i
 low-level terminal operations. 
 
 
-## 📄 Documentation
+## 📚 Documentation
 
 Read the documentation at TODO. 
+
+
+## 🪧 A Note on the Backend
+ 
+Ratatui has support for several terminal backends. If you don't know what that means, this holds no
+significance to you. 
+ 
+Tundra currently only supports the crossterm backend. This is due to a lack of abstraction over the different
+backends. Code — particularly pertaining to context and event handling — would have to be written and
+repeated for each backend. 
+ 
+If you need another backend for your project, Tundra is not for you — at least for the moment. 

@@ -12,6 +12,8 @@ Tundra aims to extend the functionality of Ratatui with utilities for:
 - Displaying messages through modal dialogs. 
 - Receiving user input through input forms and fields. 
 
+Tundra is also highly extensible with tools to easily define your own dialogs and input fields. 
+
 It is **not** intended to be a replacement for or wrapper over Ratatui, nor the backend. Ratatui is still
 required to draw the user interface of each application state, and the backend is still required for
 low-level terminal operations. 
@@ -19,12 +21,12 @@ low-level terminal operations.
 
 ## 📚 Documentation
 
-Read the documentation at TODO. 
+Read the documentation **[HERE](www.google.com)**. 
 
 
 ## 🪧 A Note on the Backend
  
-Ratatui has support for several terminal backends. If you don't know what that means, this holds no
+Ratatui has support for several terminal backends. If you don't know what that means, this note holds no
 significance to you. 
  
 Tundra currently only supports the crossterm backend. This is due to a lack of abstraction over the different

@@ -244,7 +244,7 @@ fn draw_dialog<'a>(info: DrawInfo<'a>, frame: &mut Frame) {
         None => p, 
     };
     let body = wrap(Paragraph::new(body));
-    let hint = wrap(Paragraph::new(hint));
+    let hint = wrap(Paragraph::new(hint)).italic();
 
     let frame_size = frame.size();
     let inner_width = (frame_size.width as f32 * width_factor) as u16;

@@ -105,7 +105,10 @@ pub trait State: Sized {
     /// Update the state with a key press input. 
     /// 
     /// This is called by the default implementation of [`State::event`] when a key input event is read. 
-    fn input(&mut self, key: KeyEvent, ctx: &mut Context<Self::Global>) -> Result<Signal, Self::Error>;
+    #[allow(unused_variables)]
+    fn input(&mut self, key: KeyEvent, ctx: &mut Context<Self::Global>) -> Result<Signal, Self::Error> {
+        Ok(Signal::Running)
+    }
 
     /// Update the state with an event. 
     /// 

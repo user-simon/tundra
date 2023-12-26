@@ -1,4 +1,4 @@
-//! Dialogs displayed in the middle of the screen, covering some background [state](crate::State). 
+//! Modal dialogs displayed in the middle of the screen, covering some background [state](crate::State). 
 //! 
 //! The following dialogs are defined in this module: 
 //! - [`dialog::confirm`] asks the user to confirm an action before proceeding. 
@@ -19,8 +19,8 @@
 //! 
 //! To show a dialog without any background, provide the [dummy state](crate::State#dummy-state) `()`: 
 //! ```no_run
-//! # use tundra::dialog;
-//! # let ctx = &mut tundra::Context::new().unwrap();
+//! # use tundra::prelude::*;
+//! # let ctx = &mut Context::new().unwrap();
 //! // let ctx: &mut Context<_>
 //! dialog::info("Shown without a background!", &(), ctx)?;
 //! # Ok::<(), std::io::Error>(())
@@ -31,8 +31,8 @@ use ratatui::{
     Frame, 
     style::{Color, Stylize}, 
     text::Text, 
-    widgets::*, 
-    layout::{Rect, Layout, Constraint}, 
+    widgets::{*, block::Title}, 
+    layout::{Rect, Layout, Constraint, Margin}, 
 };
 use crate::prelude::*;
 
@@ -42,15 +42,17 @@ mod popup;
 pub use form::form;
 pub use popup::*;
 
-/// Content displayed inside a dialog pop-up covering the middle of some background [state](crate::State). 
+/// Interface for content displayed inside a dialog. 
 /// 
 /// For most applications, the [library provided dialogs](dialog) should suffice, but custom dialogs may be
 /// created by implementing this trait. 
 /// 
-/// This essentially serves as a wrapper over [`State`] to provide the rendering of the dialog box and 
+/// This essentially serves as a wrapper over [`State`] to provide the drawing of the dialog box and 
 /// background state. 
 /// 
+/// 
 /// # Examples
+/// 
 /// Creating a custom confirmation dialog (this is more or less the same as the one provided through 
 /// [`dialog::confirm`]): 
 /// ```no_run
@@ -69,6 +71,7 @@ pub use popup::*;
 ///             color: Color::Yellow, 
 ///             body: self.msg.clone().into(), 
 ///             hint: "Press (y) to confirm, (n) to cancel...".into(), 
+///             ..Default::default()
 ///         }
 ///     }
 /// 
@@ -111,7 +114,7 @@ pub trait Dialog: Sized {
 
     /// Runs the dialog to fruition over some background state. 
     /// 
-    /// This is a wrapper over [`State::run`] with added logic to render the dialog box and background
+    /// This is a wrapper over [`State::run`] with added logic to draw the dialog box and background
     /// state. 
     fn run_over<G>(self, background: &impl State, ctx: &mut Context<G>) -> io::Result<Option<Self>> {
         Container{ content: self, background }
@@ -120,19 +123,78 @@ pub trait Dialog: Sized {
     }
 }
 
-/// Defines how to render content inside a dialog. 
+/// Defines how to draw a dialog and its contents. 
 /// 
-/// This is interpreted by the dialog state when drawing. 
+/// This is returned from [`Dialog::format`] and is interpreted by the dialog state when drawing. 
+/// 
+/// Note that most (though not all) variables used when
+/// drawing dialogs are factored out in this struct for flexibility --- many of which are likely not relevant
+/// for most dialogs. In these cases, set the required variables and defer to the default implementation for
+/// the remainder. 
+/// 
+/// 
+/// # Examples
+/// 
+/// To draw a red dialog with title "Attention!", body "You are an ugly boy.", and hint
+/// "Press any key to accept...": 
+/// ```no_run
+/// # use tundra::dialog::DrawInfo;
+/// DrawInfo {
+///     title: "Attention!".into(), 
+///     color: Color::Red, 
+///     body: "You are an ugly boy.".into(), 
+///     hint: "Press any key to accept...".into(), 
+///     ..Default::default()
+/// }
 #[derive(Clone, Debug)]
 pub struct DrawInfo<'a> {
-    /// User-visible title of the dialog box. 
+    /// User-visible title of the dialog box. Default: `""`. 
     pub title: Cow<'a, str>, 
-    /// Colour of the entire dialog. 
+    /// Colour of the entire dialog. Default: `Color::Cyan`. 
     pub color: Color, 
-    /// Dialog payload. 
+    /// Dialog payload. Default: `""`. 
     pub body: Text<'a>, 
-    /// String displayed at the bottom in italics, for example for displaying the dialog key binds. 
-    pub hint: Cow<'a, str>,
+    /// String displayed at the bottom in italics, for example for displaying the dialog key binds. Default: 
+    /// `""`. 
+    pub hint: Cow<'a, str>, 
+    /// Margin `[horizontal, vertical]` between the border and the body. Default: `[3, 1]`. 
+    pub inner_margin: [u16; 2], 
+    /// Width of the dialog as a factor of the total width of the terminal. Default: `0.5`. 
+    pub width_factor: f32, 
+    /// Settings used to wrap the hint and body [`Paragraph`]s. Set to `None` to disable wrapping. Default: 
+    /// uses wrapping with [`Wrap::trim`] set to true. 
+    pub wrap: Option<Wrap>, 
+    /// Function constructing a [`Title`] from a string. Default: turns the title uppercase and inserts a
+    /// space on either side of it. 
+    pub create_title: fn(Cow<'a, str>) -> Title<'a>, 
+    /// Function constructing the [`Block`], which represents the dialog box. Note that two properties are
+    /// later overriden: 
+    /// - `Block::fg()`, which is set to [`color`](DrawInfo::color). 
+    /// - `Block::title()`, which is set to the output of [`create_title`](DrawInfo::create_title). 
+    /// 
+    /// Default: uses `Borders::ALL` and `BorderType::Thick`. 
+    pub create_block: fn() -> Block<'a>, 
+}
+
+impl<'a> Default for DrawInfo<'a> {
+    fn default() -> DrawInfo<'a> {
+        DrawInfo {
+            title: "".into(), 
+            color: Color::Cyan, 
+            body: "".into(), 
+            hint: "".into(), 
+            inner_margin: [3, 1], 
+            width_factor: 0.5, 
+            wrap: Some(Wrap{ trim: true }), 
+            create_title: |title| match title.is_empty() {
+                true => "".into(), 
+                false => format!(" {title} ").to_uppercase().into(), 
+            }, 
+            create_block: || Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Thick), 
+        }
+    }
 }
 
 /// This represents the dialog box and serves as the common [`State`] implementation for all
@@ -140,7 +202,7 @@ pub struct DrawInfo<'a> {
 /// 
 /// It is responsible for rendering the dialog box, dialog contents, and background state. 
 struct Container<'a, T, U> {
-    /// The [dialog](Dialog), proper. 
+    /// Dialog contents. 
     content: T, 
     /// Background state. 
     background: &'a U, 
@@ -163,19 +225,29 @@ impl<T: Dialog, U: State> State for Container<'_, T, U> {
     }
 }
 
-fn draw_dialog(info: DrawInfo, frame: &mut Frame) {
-    const HORIZONTAL_MARGIN: u16 = 3;
-    const VERTICAL_MARGIN: u16 = 1;
-    const WIDTH_FACTOR: f32 = 0.5;
+#[inline(never)]
+fn draw_dialog<'a>(info: DrawInfo<'a>, frame: &mut Frame) {
+    let DrawInfo {
+        title, 
+        body, 
+        color, 
+        hint, 
+        inner_margin: [inner_margin_x, inner_margin_y], 
+        width_factor, 
+        wrap, 
+        create_title, 
+        create_block, 
+    } = info;
 
-    let DrawInfo{ title, body, color, hint } = info;
-
-    let wrap = Wrap{ trim: false };
-    let hint = Paragraph::new(hint).wrap(wrap);
-    let body = Paragraph::new(body).wrap(wrap);
+    let wrap = |p: Paragraph<'a>| match wrap {
+        Some(wrap) => p.wrap(wrap), 
+        None => p, 
+    };
+    let body = wrap(Paragraph::new(body));
+    let hint = wrap(Paragraph::new(hint));
 
     let frame_size = frame.size();
-    let inner_width = (frame_size.width as f32 * WIDTH_FACTOR) as u16;
+    let inner_width = (frame_size.width as f32 * width_factor) as u16;
 
     let [hint_height, body_height] = [&hint, &body].map(|x|
         x.line_count(inner_width) as u16
@@ -184,23 +256,21 @@ fn draw_dialog(info: DrawInfo, frame: &mut Frame) {
     // draw box and compute its inner area
     let inner_area = {
         let inner_height = body_height + hint_height + 1;
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(format!(" {} ", title.to_uppercase()))
-            .border_type(BorderType::Thick)
+        let title = create_title(title);
+        let block = create_block()
+            .title(title)
             .fg(color);
         let [outer_width, outer_height] = outer_size(
             &block, 
-            inner_width + HORIZONTAL_MARGIN * 2, 
-            inner_height + VERTICAL_MARGIN * 2, 
+            inner_width + inner_margin_x * 2, 
+            inner_height + inner_margin_y * 2, 
         );
 
         let Rect{ width: frame_width, height: frame_height, .. } = frame_size;
-        let outer_area = Layout::default()
-            .constraints([Constraint::Min(0)])
-            .horizontal_margin(frame_width.saturating_sub(outer_width) / 2)
-            .vertical_margin(frame_height.saturating_sub(outer_height) / 2)
-            .split(frame_size)[0];
+        let outer_area = frame_size.inner(&Margin{
+            horizontal: frame_width.saturating_sub(outer_width) / 2,
+            vertical: frame_height.saturating_sub(outer_height) / 2,
+        });
         let inner_area = block.inner(outer_area);
 
         frame.render_widget(Clear, outer_area);
@@ -211,21 +281,18 @@ fn draw_dialog(info: DrawInfo, frame: &mut Frame) {
 
     // draw body and hint inside the inner area
     {
-        let [body_area, hint_area] = {
-            let layout = Layout::default()
-                .horizontal_margin(HORIZONTAL_MARGIN)
-                .vertical_margin(VERTICAL_MARGIN)
-                .constraints([
-                    Constraint::Length(body_height), 
-                    Constraint::Min(0), 
-                    Constraint::Length(hint_height), 
-                ])
-                .split(inner_area);
-            [layout[0], layout[2]]
-        };
+        let layout = Layout::default()
+            .horizontal_margin(inner_margin_x)
+            .vertical_margin(inner_margin_y)
+            .constraints([
+                Constraint::Length(body_height), 
+                Constraint::Min(0), 
+                Constraint::Length(hint_height), 
+            ])
+            .split(inner_area);
     
-        frame.render_widget(body, body_area);
-        frame.render_widget(hint, hint_area);
+        frame.render_widget(body, layout[0]);
+        frame.render_widget(hint, layout[2]);
     }
 }
 

@@ -15,18 +15,19 @@ pub enum Signal {
 /// Defines the event loop of an application state. 
 /// 
 /// 
-/// # Usage 
+/// # Usage
 /// 
-/// The event loop is entered by calling [`State::run`]. 
+/// For most applications, implementing [`State::draw`] and [`State::input`] will suffice. 
+/// - [`State::draw`] draws the user interface using [Ratatui](ratatui). 
+/// - [`State::input`] handles key press events. 
 /// 
-/// Key input events are handled from [`State::input`], representing the most common use case. If other
-/// events are needed, [`State::event`] may be implemented --- whose default implementation simply delegates
-/// key input events to [`State::input`] and discards the rest. 
+/// Afterward, [`State::run`] may be called to enter the event loop. 
 /// 
-/// The state is drawn from [`State::draw`]. See [Ratatui's documentation](ratatui) on how to construct and
-/// render widgets. 
+/// If [events](Event) other than key press events are required in an application, it may implement
+/// [`State::event`], which handles any and all events read from the backend. Its default implementation
+/// simply delegates key press events to [`State::input`] and discards the rest. 
 /// 
-/// The interface provided by [`State::run`] is fairly low-level. In most cases, a wrapper function may be
+/// The interface provided by [`State::run`] is fairly low-level. In most cases, a wrapper function should be
 /// used to provide a more bespoke interface. E.g., [`dialog::confirm`], which creates a confirm dialog
 /// state, runs it, and then returns whether the user pressed `y` or `n`. 
 /// 
@@ -49,30 +50,29 @@ pub enum Signal {
 /// 
 /// # Examples 
 /// 
-/// To create a state 
+/// A state with a counter that increases when the user presses `up`: 
+/// 
 /// ```no_run
 /// use std::io;
 /// use ratatui::widgets::Paragraph;
 /// use tundra::prelude::*;
 /// 
-/// struct MyState {
-///     counter: i32, 
+/// struct Counter {
+///     value: u32, 
 /// }
 /// 
-/// impl State for MyState {
+/// impl State for Counter {
 ///     type Error = io::Error;
 ///     type Global = ();
-/// 
+///     
 ///     fn draw(&self, frame: &mut Frame) {
-///         let counter_string = format!("{}", self.counter);
-///         let widget = Paragraph::new(counter_string);
+///         let widget = Paragraph::new(format!("{}", self.value));
 ///         frame.render_widget(widget, frame.size());
 ///     }
-/// 
+///     
 ///     fn input(&mut self, key: KeyEvent, ctx: &mut Context) -> io::Result<Signal> {
 ///         match key.code {
-///             KeyCode::Up    => self.counter += 1, 
-///             KeyCode::Down  => self.counter -= 1, 
+///             KeyCode::Up    => self.value += 1, 
 ///             KeyCode::Enter => return Ok(Signal::Done), 
 ///             KeyCode::Esc   => return Ok(Signal::Cancelled), 
 ///             _ => (), 
@@ -81,23 +81,25 @@ pub enum Signal {
 ///     }
 /// }
 /// 
-/// // wrapper function that constructs the state, runs it, and returns the entered value
-/// pub fn run_my_state(ctx: &mut Context) -> io::Result<Option<i32>> {
-///     let value = MyState{ counter: 0 }
-///         .run(ctx)?
-///         .map(|state| state.counter);
+/// // wrapper over `State::run` to return the entered value; a common pattern
+/// pub fn counter(ctx: &mut Context) -> io::Result<u32> {
+///     let counter = Counter{ value: 0 }.run(ctx)?;
+///     let value = counter
+///         .map(|c| c.value)
+///         .unwrap_or(0);
 ///     Ok(value)
 /// }
 /// ```
 pub trait State: Sized {
-    /// 
+    /// Type of error that can occur. Drawing to the terminal can cause an `io::Error` so the error type must
+    /// be able to handle that. 
     type Error: From<io::Error>;
 
     /// Type of the application-defined global inside [`Context`]. This should be set to the same type as the
     /// one used when initializing the [`Context`]. If no global is used, this may be set to `()`. 
     type Global;
 
-    /// Draw the state to a [`Frame`]. 
+    /// Draw the state to a [`Frame`] using [Ratatui](ratatui). 
     /// 
     /// See [Ratatui's documentation](ratatui) for how to construct and render widgets. 
     fn draw(&self, frame: &mut Frame);
@@ -105,6 +107,11 @@ pub trait State: Sized {
     /// Update the state with a key press input. 
     /// 
     /// This is called by the default implementation of [`State::event`] when a key input event is read. 
+    /// 
+    /// 
+    /// # Default
+    /// 
+    /// Always returns [`Signal::Running`]. 
     #[allow(unused_variables)]
     fn input(&mut self, key: KeyEvent, ctx: &mut Context<Self::Global>) -> Result<Signal, Self::Error> {
         Ok(Signal::Running)
@@ -114,8 +121,11 @@ pub trait State: Sized {
     /// 
     /// This is called by the default implementation of [`State::run`] when an event is read. 
     /// 
-    /// The default implementation of this function simply delegates to [`State::input`], representing the
-    /// most common use case. All other events are discarded. 
+    /// 
+    /// # Default
+    /// 
+    /// Simply delegates to [`State::input`], representing the most common use case. All other events are
+    /// discarded. 
     fn event(&mut self, event: Event, ctx: &mut Context<Self::Global>) -> Result<Signal, Self::Error> {
         if let Event::Key(key_event) = event {
             self.input(key_event, ctx)
@@ -124,7 +134,10 @@ pub trait State: Sized {
         }
     }
 
-    /// The event loop. 
+    /// Enters the event loop. 
+    /// 
+    /// 
+    /// # Default
     /// 
     /// Calls [`State::draw`] and [`State::event`] until the latter returns [`Signal::Done`] or
     /// [`Signal::Cancelled`]. 

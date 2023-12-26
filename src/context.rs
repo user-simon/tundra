@@ -118,7 +118,9 @@ impl<G> Context<G> {
 
     /// Applies an arbitrary function to the internal [`Terminal`] handle. 
     /// 
+    /// 
     /// # Examples
+    /// 
     /// ```
     /// # use tundra::{Context, Terminal};
     /// # let ctx = Context::new().unwrap();
@@ -140,7 +142,9 @@ impl<G> Context<G> {
 
     /// Applies an arbitrary function to the internal [`Terminal`] handle. 
     /// 
+    /// 
     /// # Examples
+    /// 
     /// ```
     /// # use tundra::{Context, Terminal};
     /// # let mut ctx = Context::new().unwrap();
@@ -168,6 +172,11 @@ impl<G> Context<G> {
         )
     }
 
+    /// Creates a new context with a new global from an existing context, reusing the internal [`Terminal`]
+    /// handle. 
+    /// 
+    /// This can be used "replace" the global value. See the
+    /// [context documentation](Context#chaining-with-new-globals) for more information. 
     pub fn chain_with_global<F>(&self, global: F) -> Context<F> {
         Context {
             global, 
@@ -175,6 +184,11 @@ impl<G> Context<G> {
         }
     }
 
+    /// Creates a new context without a global from an existing context, reusing the internal [`Terminal`]
+    /// handle. 
+    /// 
+    /// This can be used "remove" the global value. See the
+    /// [context documentation](Context#chaining-with-new-globals) for more information. 
     pub fn chain_without_global(&self) -> Context {
         self.chain_with_global(())
     }

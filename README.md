@@ -30,7 +30,7 @@ Modal dialogs are small pop-up "windows" displayed atop a background application
 messages or prompt user input and are shown simply by calling a function. Here is an example of an error
 message shown in a dialog: 
 
-<img src="img/dialog_error.png" width="50%">
+![dialog error demo](img/dialog_error.png)
 
 Tundra defines several more such dialogs with easy-to-use interfaces, and provides utilities for creating
 your own dialogs. 

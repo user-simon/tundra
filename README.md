@@ -24,6 +24,23 @@ low-level terminal operations.
 Read the documentation **[HERE](www.google.com)**. 
 
 
+## 🪪 Modal Dialogs
+
+Modal dialogs are small pop-up "windows" displayed atop a background application state. They can contain
+messages or prompt user input and are shown simply by calling a function. Here is an example of an error
+message shown in a dialog: 
+
+<img src="img/dialog_error.png" width="50%">
+
+Tundra defines several more such dialogs with easy-to-use interfaces, and provides utilities for creating
+your own dialogs. 
+
+
+## 🕹️ User Input
+
+TODO
+
+
 ## 🪧 A Note on the Backend
  
 Ratatui has support for several terminal backends. If you don't know what that means, this note holds no

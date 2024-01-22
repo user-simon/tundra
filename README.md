@@ -26,19 +26,26 @@ Read the documentation **[HERE](www.google.com)**.
 
 ## 🪪 Modal Dialogs
 
-Modal dialogs are small pop-up "windows" displayed atop a background application state. They can contain
-messages or prompt user input and are shown simply by calling a function. Here is an example of an error
-message shown in a dialog: 
+Modal dialogs are small pop-up "windows" displayed atop a background application state. They contain messages
+or prompt for user input and are shown simply by calling a function. Here is an example of an error message
+shown in a dialog: 
 
 ![dialog error demo](img/dialog_error.png)
 
 Tundra defines several more such dialogs with easy-to-use interfaces, and provides utilities for creating
-your own dialogs. 
+custom dialogs. 
 
 
 ## 🕹️ User Input
 
-TODO
+User input is facilitated through a macro that displays a form with specified fields inside a dialog. The 
+return value of the macro invocation is a struct containing the values entered by the user for each field. Both the values and the fields are stored as members of unspellable structs created inside the macro — 
+no runtime lookup is required! Here is an example of showing such a form: 
+
+![dialog form demo](img/dialog_form.png)
+
+Tundra defines several types of fields for entering common types of data, and provides utilities for 
+creating custom fields. 
 
 
 ## 🪧 A Note on the Backend

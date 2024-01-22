@@ -26,6 +26,9 @@
 //! # Ok::<(), std::io::Error>(())
 //! ```
 
+mod basic;
+pub mod form;
+
 use std::{io, borrow::Cow};
 use ratatui::{
     Frame, 
@@ -36,11 +39,8 @@ use ratatui::{
 };
 use crate::prelude::*;
 
-pub mod form;
-mod popup;
-
+pub use basic::*;
 pub use form::form;
-pub use popup::*;
 
 /// Interface for content displayed inside a dialog. 
 /// 
@@ -144,7 +144,7 @@ pub trait Dialog: Sized {
 /// }
 /// # ;
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct DrawInfo<'a> {
     /// User-visible title of the dialog box. Default: `""`. 
     pub title: Cow<'a, str>, 
@@ -157,8 +157,9 @@ pub struct DrawInfo<'a> {
     pub hint: Cow<'a, str>, 
     /// Margin `[horizontal, vertical]` between the border and the body. Default: `[3, 1]`. 
     pub inner_margin: [u16; 2], 
-    /// Width of the dialog as a factor of the total width of the terminal. Default: `0.5`. 
-    pub width_factor: f32, 
+    /// Width of the dialog as a percentage (between `0` and `100`) of the total width of the terminal. 
+    /// Default: `50`. 
+    pub width_percentage: u8, 
     /// Settings used to wrap the hint and body [`Paragraph`]s. Set to `None` to disable wrapping. Default: 
     /// uses wrapping with [`Wrap::trim`] set to true. 
     pub wrap: Option<Wrap>, 
@@ -182,7 +183,7 @@ impl<'a> Default for DrawInfo<'a> {
             body: "".into(), 
             hint: "".into(), 
             inner_margin: [3, 1], 
-            width_factor: 0.5, 
+            width_percentage: 50, 
             wrap: Some(Wrap{ trim: true }), 
             create_title: |title| match title.is_empty() {
                 true => "".into(), 
@@ -231,7 +232,7 @@ fn draw_dialog<'a>(info: DrawInfo<'a>, frame: &mut Frame) {
         color, 
         hint, 
         inner_margin: [inner_margin_x, inner_margin_y], 
-        width_factor, 
+        width_percentage, 
         wrap, 
         create_title, 
         create_block, 
@@ -245,7 +246,7 @@ fn draw_dialog<'a>(info: DrawInfo<'a>, frame: &mut Frame) {
     let hint = wrap(Paragraph::new(hint)).italic();
 
     let frame_size = frame.size();
-    let inner_width = (frame_size.width as f32 * width_factor) as u16;
+    let inner_width = (frame_size.width * width_percentage as u16) / 100;
 
     let [hint_height, body_height] = [&hint, &body].map(|x|
         x.line_count(inner_width) as u16
@@ -265,7 +266,7 @@ fn draw_dialog<'a>(info: DrawInfo<'a>, frame: &mut Frame) {
         );
 
         let Rect{ width: frame_width, height: frame_height, .. } = frame_size;
-        let outer_area = frame_size.inner(&Margin{
+        let outer_area = frame_size.inner(&Margin {
             horizontal: frame_width.saturating_sub(outer_width) / 2,
             vertical: frame_height.saturating_sub(outer_height) / 2,
         });

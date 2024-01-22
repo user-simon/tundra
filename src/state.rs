@@ -3,6 +3,7 @@ use crossterm::event::{self, Event};
 use crate::prelude::*;
 
 /// Communicates when and what to return from [`State::run`] by a running state. 
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum Signal {
     /// The state should exit and be returned. 
     Done, 
@@ -156,7 +157,8 @@ pub trait State: Sized {
     }
 }
 
-/// Implements a dummy (or no-op) [`State`] through `()`. 
+/// Implements a dummy (or no-op) [`State`] through `()`. It draws nothing and exits as soon as a key is
+/// pressed. 
 /// 
 /// This is useful when a state is expected but not used; e.g. if you want to display a [`dialog`] without a
 /// background. 

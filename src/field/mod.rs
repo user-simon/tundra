@@ -169,6 +169,7 @@ pub trait Field: Sized {
 /// Note that care should be taken when and when not to return [`Consumed`](InputResult::Consumed), since it
 /// blocks [forms](crate::dialog::form!) from responding to [`KeyCode::Up`](crate::prelude::KeyCode::Up) and
 /// [`KeyCode::Down`](crate::prelude::KeyCode::Down) inputs. 
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum InputResult {
     /// The key press was ignored. 
     Ignored, 

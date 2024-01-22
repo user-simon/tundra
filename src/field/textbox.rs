@@ -3,8 +3,9 @@ use ratatui::prelude::*;
 use crate::prelude::*;
 use super::{*, builder::*};
 
-/// An [input field](super) for entering single-line strings. See [`textbox::Builder`] for the methods
-/// available when constructing the field. 
+/// An [input field](super) for entering single-line strings. 
+/// 
+/// See [`textbox::Builder`] for the methods available when constructing the field. 
 /// 
 /// 
 /// # Hidden input

@@ -11,8 +11,7 @@ use ratatui::{
 use crate::prelude::*;
 use super::{*, builder::*};
 
-/// An [input field](super) for entering a numerical value. See [`slider::Builder`] for the methods available
-/// when constructing the field. 
+/// An [input field](super) for entering a numerical value. 
 /// 
 /// The type parameter `T` is the type of the value being entered. The following bounds are placed on `T`: 
 /// ```text
@@ -21,6 +20,8 @@ use super::{*, builder::*};
 /// ```
 /// Those bounds hold for all primitive numerical types (e.g., `i8`, `usize`, `f64`), but the design allows
 /// for other types as well. 
+/// 
+/// See [`slider::Builder`] for the methods available when constructing the field. 
 /// 
 /// 
 /// # Key bindings
@@ -153,16 +154,16 @@ impl<T, const NAME: bool> Builder<T, NAME> {
     /// The initial and default value. 
     pub fn value(self, value: T) -> Self
     where
-        T: Clone
+        T: Clone, 
     {
         let default = value.clone();
         Builder(Slider{ value, default, ..self.0 })
     }
 
-    /// The allowed range of the value that can be entered. 
+    /// The allowed range of the value that can be entered. Clamps the value to the range. 
     pub fn range(self, range: RangeInclusive<T>) -> Self
     where
-        T: Clone + PartialOrd
+        T: Clone + PartialOrd, 
     {
         let (min, max) = range.clone().into_inner();
         let value = self.0.value.clone();

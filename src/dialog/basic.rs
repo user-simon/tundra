@@ -47,7 +47,7 @@ pub fn fatal<G>(msg: impl AsRef<str>, ctx: &mut Context<G>) -> io::Result<()> {
 
 /// Displays a dialog showing a message of specified [level](MessageLevel). 
 fn message<G>(msg: &str, level: MessageLevel, over: &impl State, ctx: &mut Context<G>) -> io::Result<()> {
-    Message{ msg, msg_level: level }
+    Message{ msg, level }
         .run_over(over, ctx)
         .map(|_| ())
 }
@@ -63,12 +63,12 @@ enum MessageLevel {
 /// Dialog to simply show a message to the user. 
 struct Message<'a> {
     msg: &'a str, 
-    msg_level: MessageLevel, 
+    level: MessageLevel, 
 }
 
 impl Dialog for Message<'_> {
     fn format(&self) -> DrawInfo {
-        let (title, color) = match self.msg_level {
+        let (title, color) = match self.level {
             MessageLevel::Info    => ("Info",        Color::Cyan), 
             MessageLevel::Warning => ("Warning",     Color::Yellow), 
             MessageLevel::Error   => ("Error",       Color::Red), 

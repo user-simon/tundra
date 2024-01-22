@@ -13,10 +13,9 @@ use super::{*, builder::*};
 /// # Limiting the number of toggled items
 /// 
 /// The allowed range of the number items to be toggled at any given time can be customised with
-/// [`Toggle::set_range`] or [`Builder::range`]. E.g., a range of `2..=4` allows there to be
-/// up-to-and-including 4, but at least 2, toggled items. If the limit is reached and another item is
-/// toggled, the oldest toggled item is toggled off. The default range allows any number of items to be
-/// toggled. 
+/// [`Toggle::range`] or [`Builder::range`]. E.g., a range of `2..=4` allows there to be up-to-and-including
+/// 4, but at least 2, toggled items. If the limit is reached and another item is toggled, the oldest toggled
+/// item is toggled off. The default range allows any number of items to be toggled. 
 /// 
 /// 
 /// # Key bindings
@@ -28,7 +27,7 @@ pub struct Toggle {
     /// The user-visible name displayed by the input field. 
     pub name: Cow<'static, str>, 
     /// The allowed range of the number of items to be toggled at any given time. 
-    range: RangeInclusive<usize>, 
+    pub range: RangeInclusive<usize>, 
     /// Index of the currently focused item. 
     focus: usize, 
     /// The user-visible names of the items that can be toggled. 
@@ -88,25 +87,6 @@ impl Toggle {
         self.log = log;
 
         debug_assert!(self.values.len() == self.items.len());
-    }
-
-    /// Sets the allowed range of toggled values. See the
-    /// [type-level](Toggle#limiting-the-number-of-toggled-items) documentation for more information. This
-    /// also ensures that at least `range.start()` items are toggled. 
-    pub fn set_range(&mut self, range: RangeInclusive<usize>) {
-        self.range = range;
-        let min = self.range
-            .start()
-            .clone();
-        let difference = min.saturating_sub(self.pop_count());
-        let free = iter::zip(self.values.iter_mut(), self.log.iter_mut())
-            .filter(|(&mut b, _)| !b)
-            .take(difference);
-
-        for (value, log) in free {
-            *value = true;
-            *log = Some(self.time)
-        }
     }
 
     /// Gets the names of the items that can be toggled. 
@@ -295,14 +275,25 @@ impl<const NAME: bool, const ITEMS: bool> Builder<NAME, ITEMS> {
     }
 
     /// The allowed range of toggled values. See the
-    /// [type-level](Toggle#limiting-the-number-of-toggled-items) documentation for more information. This
-    /// also ensures that at least `range.start()` items are toggled. 
+    /// [type-level](Toggle#limiting-the-number-of-toggled-items) documentation for more information. Ensures
+    /// that at least `range.start()` items are toggled. 
     pub fn range(mut self, range: RangeInclusive<usize>) -> Self
     where
         Defined<ITEMS>: True, 
     {
-        self.0.set_range(range);
-        Builder(self.0)
+        let min = range
+            .start()
+            .clone();
+        let difference = min.saturating_sub(self.0.pop_count());
+        let free = iter::zip(self.0.values.iter_mut(), self.0.log.iter_mut())
+            .filter(|(&mut b, _)| !b)
+            .take(difference);
+
+        for (value, log) in free {
+            *value = true;
+            *log = Some(0)
+        }
+        Builder(Toggle{ range, ..self.0 })
     }
 
     /// If the name has been defined with [`Builder::name`] and the items have been defined with

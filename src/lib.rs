@@ -23,13 +23,11 @@
 //! # Getting Started
 //! 
 //! Add Tundra and Ratatui to the project dependencies: 
-//! 
-//! ```plain_text
+//! ```text
 //! $ cargo add tundra ratatui
 //! ```
 //! 
 //! Import the [Tundra prelude](prelude), exposing symbols required in virtually all applications: 
-//! 
 //! ```no_run
 //! use tundra::prelude::*;
 //! ```
@@ -142,6 +140,7 @@
 //! ```no_run
 //! # use std::io;
 //! # use tundra::prelude::*;
+//! # fn counter(_: &mut Context) -> io::Result<u32> { Ok(0) }
 //! # struct Counter{ value: u32 };
 //! # impl Counter {
 //! fn input(&mut self, key: KeyEvent, ctx: &mut Context) -> io::Result<Signal> {
@@ -155,16 +154,40 @@
 //!     Ok(Signal::Running)
 //! }
 //! # }
-//! # fn counter(_: &mut Context) -> io::Result<u32> { Ok(0) }
 //! ```
 //! 
-//! See the [counter example](https://github.com/user-simon/tundra/blob/main/examples/counter.rs) for the
+//! See the [`counter` example](https://github.com/user-simon/tundra/blob/main/examples/counter.rs) for the
 //! complete code. 
 //! 
 //! 
-//! # Dialogs
+//! # Modal Dialogs
 //! 
-//! TODO
+//! Modal dialogs are small pop-up "windows" displayed atop a background state. They contain messages or
+//! prompt for user input and are shown simply by calling a function. Here is an example of showing an error
+//! message in a dialog: 
+//! ```no_run
+//! # use tundra::prelude::*;
+//! # let current_state = &();
+//! # let ctx = &mut Context::new().unwrap();
+//! // let current_state: &impl State
+//! // let ctx: &mut Context<_>
+//! dialog::error("Failed evicting tenant.", current_state, ctx)?;
+//! # Ok::<(), std::io::Error>(())
+//! ```
+//! 
+//! Here, `current_state` is a reference to whatever state the dialog should be drawn over. If the dialog is
+//! being invoked from within a state, this would be `&self`. The error dialog --- and the [`dialog::error`]
+//! function by extension --- returns once the user presses a key, acknowledging the error. Above a state
+//! with a [table](ratatui::widgets::Table), this shows as:  
+//! 
+//! ![dialog error demo](https://raw.githubusercontent.com/user-simon/tundra/main/img/dialog_error.png)
+//! 
+//! See the [dialog module](dialog) for a full list of the dialogs provided by Tundra, and for how to create
+//! your own! 
+//! 
+//! Note that there is nothing magic about dialogs; they are implemented using the same machinery as any
+//! other state, but have added logic to store a reference to the background state and to draw it before the
+//! dialog. 
 //! 
 //! 
 //! # User Input
@@ -190,7 +213,7 @@
 
 mod context;
 pub mod dialog;
-pub mod input;
+pub mod field;
 mod state;
 
 #[doc(no_inline)]

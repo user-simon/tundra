@@ -9,10 +9,10 @@
 //! - Defining [application states](State). 
 //! - Managing the terminal [environment and context](Context). 
 //! - Displaying messages through [modal dialogs](dialog). 
-//! - Receiving user input through [input forms and fields](input). 
+//! - Receiving user input through [input forms](dialog::form!) and [fields](field). 
 //! 
 //! Tundra is also highly extensible with tools to easily define [your own dialogs](dialog::Dialog) and
-//! [input fields](input::Field). 
+//! [input fields](field::Field). 
 //! 
 //! It is **not** intended to be a replacement for or wrapper over [Ratatui](ratatui), nor the
 //! [backend](ratatui::backend). [Ratatui](ratatui) is still required to draw the user interface of each
@@ -177,8 +177,8 @@
 //! 
 //! Here, `current_state` is a reference to whatever state the dialog should be drawn over. If the dialog is
 //! being invoked from within a state, this would be `&self`. The error dialog --- and the [`dialog::error`]
-//! function by extension --- returns once the user presses a key, acknowledging the error. Above a state
-//! with a [table](ratatui::widgets::Table), this shows as:  
+//! function by extension --- returns once the user presses a key, acknowledging the error. Above some state
+//! with a [Ratatui table](ratatui::widgets::Table), this shows as:  
 //! 
 //! ![dialog error demo](https://raw.githubusercontent.com/user-simon/tundra/main/img/dialog_error.png)
 //! 
@@ -192,7 +192,51 @@
 //! 
 //! # User Input
 //! 
-//! TODO
+//! User input is facilitated through the [form macro](dialog::form!), which displays a dialog containing a
+//! specified set of [input fields](field). The return value of the macro invocation is a struct containing 
+//! the values entered by the user for each field. Here is an example of showing a form, and once its been
+//! submitted, retrieving the entered values: 
+//! ```no_run
+//! # use tundra::{prelude::*, field::*};
+//! # let current_state = &();
+//! # let ctx = &mut Context::new().unwrap();
+//! // let current_state: &impl State
+//! // let ctx: &mut Context<_>
+//! 
+//! let values = dialog::form!{
+//!     location: Textbox{ name: "Location" }, 
+//!     rent: Slider<u32>{ name: "Monthly rent", range: 1..=5000, step: 50 }, 
+//!     pets_allowed: Checkbox{ name: "Pets allowed" }, 
+//!     [title]: "Register Rent Unit", 
+//!     [context]: ctx, 
+//!     [background]: current_state, 
+//! }?;
+//! 
+//! if let Some(values) = values {
+//!     let location: String = values.location;
+//!     let rent: u32 = values.rent;
+//!     let pets_allowed: bool = values.pets_allowed;
+//! }
+//! # Ok::<(), std::io::Error>(())
+//! ```
+//! 
+//! Some notes about the example: 
+//! - As with other dialogs, a context and background state must be provided. For forms, this is done with
+//! the `[context]` and `[background]` "meta-fields". 
+//! - The values (and the fields) are stored as members of unspellable structs created inside the macro --- 
+//! no runtime lookup is required! Values are accessed using the same identifers that the corresponding
+//! fields were declared with. 
+//! - Forms can be cancelled by the user, which is represented by a `None` return value. 
+//! - The type annotations for the field values are not required. 
+//! 
+//! Above some state with a [Ratatui table](ratatui::widgets::Table) (and with some example data entered),
+//! this shows as: 
+//! 
+//! ![dialog form demo](https://raw.githubusercontent.com/user-simon/tundra/main/img/dialog_form.png)
+//! 
+//! See the [form macro](dialog::form!) for the complete macro specification, and see the
+//! [field module](field) for a full list of the field types provided by Tundra, and for how to create your
+//! own!
 //! 
 //! 
 //! # A Note on the Backend

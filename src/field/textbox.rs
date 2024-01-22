@@ -1,23 +1,41 @@
 use std::borrow::Cow;
-use ratatui::{
-    text::{Line, Span}, 
-    style::{Style, Stylize}
-};
+use ratatui::prelude::*;
 use crate::prelude::*;
-use super::field::*;
+use super::{*, builder::*};
 
-/// An input [field](super::Field) for entering single-line strings. 
-#[derive(Clone, Debug, Default)]
+/// An input [field](super) for entering single-line strings. 
+/// 
+/// 
+/// # Hidden input
+/// 
+/// The entered value can be hidden with [`Textbox::hidden`] or [`Builder::hidden`]. When this is toggled,
+/// all entered characters are replaced with `•` when the textbox is drawn. 
+/// 
+/// 
+/// # Key bindings
+/// 
+/// [`KeyCode::Left`] and [`KeyCode::Right`] move the caret one character to the left and right, 
+/// respectively. If [`KeyModifiers::CONTROL`] is held, the caret moves one word in the given direction. 
+/// 
+/// [`KeyCode::Home`] and [`KeyCode::End`] move the caret to the beginning and end of the input string,
+/// respectively. 
+/// 
+/// [`KeyCode::Backspace`] and [`KeyCode::Delete`] remove one character from the left and right of the caret,
+/// respectively. If [`KeyModifiers::CONTROL`] is held, one whole word is removed in the given direction. 
+/// 
+/// [`KeyCode::Char`] inputs are inserted into the input string directly after the caret. 
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Textbox {
     /// The user-visible name displayed by the input field. 
     pub name: Cow<'static, str>, 
+    /// Whether the input should be hidden. See the [type-level](Textbox#hidden-input) documentation for more
+    /// information.
+    pub hidden: bool, 
     /// The current user-entered value. 
     value: String, 
-    /// Whether each char should be replaced with `•` when displaying the contents to the user. 
-    pub hidden: bool, 
     /// The *byte* index of the currently highlighted char. This may differ from the *char* index due to
-    /// UTF-8. To maintain this invariance, `caret` and [`value`](Textbox::value) are not directly modifiable
-    /// by application code. 
+    /// UTF-8. To maintain this invariance, `caret` and `value` are not directly modifiable by application
+    /// code. 
     caret: usize, 
 }
 
@@ -28,6 +46,7 @@ impl Textbox {
         self.caret = self.max_caret();
     }
 
+    /// Gets the current value. 
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -42,12 +61,8 @@ impl Textbox {
         [a, b, c]
     }
 
-    /// The maximum possible index for the caret, given the current value. 
-    /// 
-    /// Defined for explicitness. 
-    /// 
-    /// Note that the caret can go one char out of bounds to the right where the next symbol is to be
-    /// inserted. 
+    /// The maximum possible index for the caret, given the current value. Defined for explicitness. Note
+    /// that the caret can go one char out of bounds to the right where the next symbol is to be inserted. 
     fn max_caret(&self) -> usize {
         self.value.len()
     }
@@ -64,12 +79,9 @@ impl Textbox {
         }
     }
 
-    /// Finds the next word-boundary from the caret in the given direction. 
-    /// 
-    /// This is defined as the first occurence of a whitespace following a non-whitespace symbol. 
-    /// 
-    /// When `self.hidden == true`, all internal word-boundaries are ignored; either `0` or
-    /// [`self.max_caret()`](Textbox::max_caret) is returned. 
+    /// Finds the next word-boundary from the caret in the given direction. This is defined as the first
+    /// occurence of a whitespace following a non-whitespace symbol. When `self.hidden == true`, all internal
+    /// word-boundaries are ignored; either `0` or [`self.max_caret()`](Textbox::max_caret) is returned. 
     fn scan(&self, direction: Direction) -> usize {
         let [pre, caret, post] = self.split_caret();
         let (string, fallback) = match direction {
@@ -107,70 +119,73 @@ impl Textbox {
 
 impl Field for Textbox {
     type Value = String;
-    type Builder = Builder;
+    type Builder = Builder<false>;
 
     fn name(&self) -> &str {
         &self.name
     }
 
-    fn input(&mut self, key: KeyEvent) {
+    fn input(&mut self, key: KeyEvent) -> InputResult {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-        self.caret = match (key.code, ctrl) {
+        let (new_caret, result) = match (key.code, ctrl) {
             // move caret one char
-            (KeyCode::Left,  false) => self.step(Direction::Left), 
-            (KeyCode::Right, false) => self.step(Direction::Right), 
+            (KeyCode::Left,  false) => (self.step(Direction::Left), InputResult::Consumed), 
+            (KeyCode::Right, false) => (self.step(Direction::Right), InputResult::Consumed), 
 
             // move caret one word
-            (KeyCode::Left,  true) => self.scan(Direction::Left), 
-            (KeyCode::Right, true) => self.scan(Direction::Right), 
+            (KeyCode::Left,  true) => (self.scan(Direction::Left), InputResult::Consumed), 
+            (KeyCode::Right, true) => (self.scan(Direction::Right), InputResult::Consumed), 
 
             // move caret to beginning/end of input
-            (KeyCode::Home, _) => 0, 
-            (KeyCode::End,  _) => self.max_caret(), 
+            (KeyCode::Home, _) => (0, InputResult::Consumed), 
+            (KeyCode::End,  _) => (self.max_caret(), InputResult::Consumed), 
 
             // remove char
             (KeyCode::Backspace, false) if self.caret > 0 => {
                 let new = self.step(Direction::Left);
                 self.value.remove(new);
-                new
+                (new, InputResult::Updated)
             }
             (KeyCode::Delete, false) if self.caret < self.max_caret() => {
                 self.value.remove(self.caret);
-                self.caret
+                (self.caret, InputResult::Updated)
             }
 
             // remove word
             (KeyCode::Backspace | KeyCode::Char('w'), true) if self.caret > 0 => {
                 let end = self.scan(Direction::Left);
                 self.value.drain(end..self.caret);
-                end
+                (end, InputResult::Updated)
             }
             (KeyCode::Delete | KeyCode::Char('d'), true) if self.caret < self.max_caret() => {
                 let end = self.scan(Direction::Right);
                 self.value.drain(self.caret..end);
-                self.caret
+                (self.caret, InputResult::Updated)
             }
 
             // insert char
             (KeyCode::Char(c), false) => {
                 self.value.insert(self.caret, c);
-                self.caret + c.len_utf8()
+                (self.caret + c.len_utf8(), InputResult::Updated)
             }
-            _ => return, 
-        }
+            _ => (self.caret, InputResult::Ignored), 
+        };
+        self.caret = new_caret;
+        result
     }
 
-    fn format(&self, selected: bool) -> Line {
+    fn format(&self, focused: bool) -> Text {
         // hides the contents if `self.hidden == true`; clones them otherwise
-        let hide = match self.hidden {
+        let visibility = match self.hidden {
             true => |s: &str| s.chars()
                 .map(|_| '•')
                 .collect(),
             false => ToOwned::to_owned, 
         };
-        match selected {
+
+        match focused {
             true => {
-                let [pre, caret, post] = self.split_caret().map(hide);
+                let [pre, caret, post] = self.split_caret().map(visibility);
                 let caret = match caret.is_empty() {
                     true => " ".to_owned(),
                     false => caret,
@@ -179,10 +194,10 @@ impl Field for Textbox {
                     Span::raw(pre), 
                     Span::styled(caret, Style::new().reversed()), 
                     Span::raw(post), 
-                ])
+                ]).into()
             }
             false => {
-                hide(&self.value).into()
+                visibility(&self.value).into()
             }
         }
     }
@@ -198,14 +213,30 @@ impl Field for Textbox {
 
 /// Constructs a [`Textbox`]. 
 /// 
-/// This is used by the [form macro](macro@crate::dialog::form) when instantiating [textboxes](Textbox), but
-/// may be used in application code as well. 
-#[derive(Clone, Debug, Default)]
-pub struct Builder(pub Textbox);
+/// This is mainly used by the [form macro](crate::dialog::form!) when instantiating textboxes, but may also
+/// be used in application code for creating a stand-alone field. 
+/// 
+/// Requires that [`Builder::name`] is called before the field can be built. 
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct Builder<const NAME: bool>(Textbox);
 
-impl Builder {
+impl Default for Builder<false> {
+    fn default() -> Self {
+        Self(Textbox {
+            name: Default::default(),
+            value: Default::default(),
+            hidden: false,
+            caret: 0,
+        })
+    }
+}
+
+impl<const NAME: bool> Builder<NAME> {
     /// The user-visible name displayed by the input field. 
-    pub fn name(self, name: impl Into<Cow<'static, str>>) -> Self {
+    pub fn name(self, name: impl Into<Cow<'static, str>>) -> Builder<true>
+    where
+        Defined<NAME>: False, 
+    {
         let name = name.into();
         Builder(Textbox{ name, ..self.0 })
     }
@@ -216,14 +247,17 @@ impl Builder {
         self
     }
 
-    /// Replaces each char with `•` when displaying the contents to the user. 
+    /// Hides the input. See the [type-level](Textbox#hidden-input) documentation for more information.
     pub fn hidden(self) -> Self {
         Builder(Textbox{ hidden: true, ..self.0 })
     }
-}
 
-impl Build<Textbox> for Builder {
-    fn build(self) -> Textbox {
+    /// If the name has been defined with [`Builder::name`], consumes the builder and returns the constructed
+    /// [`Textbox`]. 
+    pub fn build(self) -> Textbox
+    where
+        Defined<NAME>: True, 
+    {
         self.0
     }
 }

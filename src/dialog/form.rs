@@ -1,6 +1,6 @@
 #![doc(hidden)]
 
-/// Displays a user input form with specified [fields](crate::input) in a [dialog](crate::dialog) to the
+/// Displays a user input form with specified [fields](crate::field) in a [dialog](crate::dialog) to the
 /// user. 
 /// 
 /// The easiest way to get a hang of how to use the macro is to just examine the [examples](#examples), but a
@@ -14,28 +14,32 @@
 /// 
 /// A field consists of:
 /// - An identifier; used to reference the entered value after the form has been submitted by the user. 
-/// - A field type; any type that implements [`Field`](crate::input::Field). 
+/// - A field type; any type that implements [`Field`](crate::field::Field). 
 /// - A set of parameters used when instantiating the field; these are translated into methods on the
-/// [field builder](crate::input::Build). There are two kinds of parameters: those with one argument and
-/// those with none. Those with one argument are specified as `IDENTIFIER: VALUE`. Those with no argument are
-/// specified simply as `IDENTIFIER`. 
+/// [field builder](crate::field::builder). There are two kinds of parameters allowed: those with one
+/// argument and those with none. Those with one argument are specified as `IDENTIFIER: VALUE`. Those with no
+/// argument are specified simply as `IDENTIFIER`. 
 /// 
 /// The syntax for declaring a field follows the form: `IDENTIFIER: TYPE{ PARAMS }`. For example, to declare
-/// a textbox with identifier `password`, and with parameters `name = "Password"` (one argument) and `hidden`
-/// (no argument): 
-/// 
+/// a textbox with identifier `password`, and parameters `name = "Password"`, `value = "admin"`, and `hidden`
+/// (no argument). 
 /// ```text
-/// password: Textbox{ name: "Password", hidden }, 
+/// password: Textbox{ name: "Password", value: "admin", hidden }, 
 /// ```
 /// 
-/// The DSL `Textbox{ name: "Password", hidden }` gets (loosely) translated as: 
-/// 
-/// ```text
-/// Textbox::Builder::default()
+/// The DSL `Textbox{ name: "Password", value: "admin", hidden }` gets (loosely) translated as: 
+/// ```no_run
+/// # use tundra::field::{Field, textbox::{Textbox, Builder}};
+/// # let _ = 
+/// <Textbox as Field>::builder()
 ///     .name("Password")
+///     .value("admin")
 ///     .hidden()
 ///     .build()
+/// # ;
 /// ```
+/// 
+/// See the [`field::builder`](crate::field::builder) module for more information about builders. 
 /// 
 /// 
 /// # Required Metadata
@@ -47,7 +51,6 @@
 /// 
 /// The syntax for providing a piece of meta-data follows the form `[IDENTIFIER]: VALUE`. For example, to
 /// provide the title of the form as `"My form"`: 
-/// 
 /// ```text
 /// [title]: "My form", 
 /// ```
@@ -68,9 +71,8 @@
 /// 
 /// The syntax for declaring a validation function follows the form `[validate]: |IDENTIFIER| EXPRESSION`. 
 /// For example, to validate that a slider `foo`'s value is non-zero: 
-/// 
 /// ```text
-/// [validate]: |form| if *form.foo == 0 {
+/// [validate]: |form| if form.foo == &0 {
 ///     Err("Foo must be non-zero!")
 /// } else {
 ///     Ok(())
@@ -88,42 +90,43 @@
 /// 
 /// # Examples
 /// 
+/// To show a form with a [textbox](crate::field::Textbox), [slider](crate::field::Slider), and
+/// [checkbox](crate::field::Checkbox), extracting the entered values from each: 
 /// ```no_run
-/// use tundra::{prelude::*, input::*};
+/// use tundra::{prelude::*, field::*};
 /// 
 /// # let current_state = &();
 /// # let ctx = &mut Context::new().unwrap();
 /// // let current_state: &impl State
 /// // let ctx: &mut Context<_>
 /// 
-/// let form = dialog::form!{
-///     foo: Textbox{ name: "Foo" }, 
-///     bar: Slider<f32>{ name: "Bar", step: 0.25, min: 0.0, max: 2.0 }, 
-///     baz: Checkbox{ name: "Baz" }, 
-///     [title]: "Here's a form!", 
+/// let values = dialog::form!{
+///     location: Textbox{ name: "Location" }, 
+///     rent: Slider<u32>{ name: "Monthly rent", range: 1..=5000, step: 50 }, 
+///     pets_allowed: Checkbox{ name: "Pets allowed" }, 
+///     [title]: "Register Rent Unit", 
 ///     [context]: ctx, 
 ///     [background]: current_state, 
 /// }?;
-/// if let Some(form) = form {
-///     let foo: String = form.foo;
-///     let bar: f32 = form.bar;
-///     let baz: bool = form.baz;
+/// if let Some(values) = values {
+///     // type annotation is not required
+///     let location: String = values.location;
+///     let rent: u32 = values.rent;
+///     let pets_allowed: bool = values.pets_allowed;
 /// }
 /// # Ok::<(), std::io::Error>(())
 /// ```
 /// 
-/// 
 /// To show a login prompt, checking the credentials before proceeding: 
-/// 
 /// ```no_run
-/// use tundra::{prelude::*, input::*};
+/// use tundra::{prelude::*, field::*};
 /// 
 /// # let current_state = &();
 /// # let ctx = &mut Context::new().unwrap();
 /// // let current_state: &impl State
 /// // let ctx: &mut Context<_>
 /// 
-/// let form = dialog::form!{
+/// let values = dialog::form!{
 ///     username: Textbox{ name: "Username" }, 
 ///     password: Textbox{ name: "Password", hidden }, 
 ///     [title]: "Login", 
@@ -135,7 +138,7 @@
 ///         Err("Invalid credentials. Try again.")
 ///     }
 /// }?;
-/// match form {
+/// match values {
 ///     Some(_) => { /* form submitted -> login success */ }
 ///     None => { /* form cancelled -> login failure */ }
 /// }
@@ -165,7 +168,7 @@ macro_rules! form {
         $(,)?
     } => {{
         struct __Form<'a> {
-            pub __selected: usize, 
+            pub __focus: usize, 
             pub __title: std::borrow::Cow<'a, str>, 
             $(
                 pub $id: $type, 
@@ -174,12 +177,12 @@ macro_rules! form {
 
         #[allow(dead_code)]
         struct __Values {$(
-            pub $id: <$type as $crate::input::Field>::Value,
+            pub $id: <$type as $crate::field::Field>::Value,
         )*}
         
         #[allow(dead_code)]
         struct __BorrowedValues<'a> {$(
-            pub $id: &'a <$type as $crate::input::Field>::Value,
+            pub $id: &'a <$type as $crate::field::Field>::Value,
         )*}
 
         #[allow(unused_variables)]
@@ -189,88 +192,69 @@ macro_rules! form {
                 1
             }
         )*;
-        const __MAX_FIELD: usize = __FIELDS - 1;
 
-        impl __Form<'_> {
-            fn format_fields(&self) -> ratatui::text::Text {
+        impl $crate::dialog::form::internal::Form for __Form<'_> {
+            type Values = __Values;
+            type BorrowedValues<'a> = __BorrowedValues<'a> where Self: 'a;
+
+            fn title(&self) -> &str {
+                std::convert::AsRef::as_ref(&self.__title)
+            }
+
+            fn max_focus(&self) -> usize {
+                __FIELDS - 1
+            }
+
+            fn focus(&self) -> usize {
+                self.__focus
+            }
+
+            fn set_focus(&mut self, focus: usize) {
+                self.__focus = focus;
+            }
+
+            fn format_dispatch(&self) -> std::vec::Vec<ratatui::text::Text> {
                 use std::vec::Vec;
-                use ratatui::text::Line;
-                use $crate::{input::Field, dialog::form::internal};
+                use ratatui::text::{Line, Text};
+                use $crate::{field::Field, dialog::form::internal};
 
-                type Dispatch = for<'a> fn(&'a __Form<'a>, bool, usize) -> Line<'a>;
+                type Dispatch = for<'a> fn(&'a __Form<'a>, bool, usize) -> Text;
 
                 let name_lengths = [$(
                     Field::name(&self.$id).len(), 
                 )*];
                 let max_name = name_lengths
-                    .iter()
+                    .into_iter()
                     .max()
-                    .copied()
                     .unwrap_or(0);
 
                 const DISPATCHES: [Dispatch; __FIELDS] = [$(
-                    |form, selected, align| internal::format_field(&form.$id, selected, align), 
+                    |form, focus, align_to| {
+                        let name = Field::name(&form.$id);
+                        let body = Field::format(&form.$id, focus);
+                        internal::format_field(name, body, focus, align_to)
+                    }, 
                 )*];
-                
+
                 DISPATCHES.iter()
                     .enumerate()
-                    .map(|(i, f)| f(self, i == self.__selected, max_name))
-                    .collect::<Vec<_>>()
-                    .into()
-            }
-        }
-
-        impl $crate::dialog::Dialog for __Form<'_> {
-            fn input(&mut self, key: $crate::KeyEvent) -> $crate::Signal {
-                use $crate::{
-                    input::Field, 
-                    KeyCode, KeyEvent, Signal, 
-                };
-                type Dispatch = fn(&mut __Form, KeyEvent);
-
-                match key.code {
-                    KeyCode::Esc => Signal::Cancelled, 
-                    KeyCode::Enter => Signal::Done, 
-                    KeyCode::Up => {
-                        self.__selected = self.__selected.saturating_sub(1);
-                        Signal::Running
-                    }
-                    KeyCode::Down => {
-                        self.__selected = match self.__selected {
-                            __MAX_FIELD => __MAX_FIELD, 
-                            c => c + 1, 
-                        };
-                        Signal::Running
-                    }
-                    _ => {
-                        const JUMP_TABLE: [Dispatch; __FIELDS] = [$(
-                            |form, key| Field::input(&mut form.$id, key)
-                        ),*];
-                        JUMP_TABLE[self.__selected](self, key);
-                        Signal::Running
-                    }
-                }
+                    .map(|(i, f)| f(self, i == self.__focus, max_name))
+                    .collect()
             }
 
-            fn format(&self) -> $crate::dialog::DrawInfo {
-                use ratatui::style::Color;
-                use $crate::dialog::DrawInfo;
+            fn input_dispatch(&mut self, key: KeyEvent) -> $crate::field::InputResult {
+                use $crate::field::{Field, InputResult};
 
-                DrawInfo {
-                    title: self.__title.as_ref().into(), 
-                    body: self.format_fields(), 
-                    hint: "Press (enter) to submit, (esc) to cancel...".into(), 
-                    ..Default::default()
-                }
+                type Dispatch = fn(&mut __Form, KeyEvent) -> InputResult;
+
+                const JUMP_TABLE: [Dispatch; __FIELDS] = [$(
+                    |form, key| Field::input(&mut form.$id, key)
+                ),*];
+                JUMP_TABLE[self.__focus](self, key)
             }
-        }
-
-        impl $crate::dialog::form::internal::Form for __Form<'_> {
-            type Values = __Values;
-            type BorrowedValues<'a> = __BorrowedValues<'a> where Self: 'a;
     
             fn into_values(self) -> Self::Values {
-                use $crate::input::Field;
+                use $crate::field::Field;
 
                 __Values {$(
                     $id: Field::into_value(self.$id), 
@@ -278,7 +262,7 @@ macro_rules! form {
             }
 
             fn values<'a>(&'a self) -> Self::BorrowedValues<'a> {
-                use $crate::input::Field;
+                use $crate::field::Field;
 
                 __BorrowedValues {$(
                     $id: Field::value(&self.$id), 
@@ -294,17 +278,15 @@ macro_rules! form {
         ).0;
         
         let __form = __Form {
-            __selected: 0, 
+            __focus: 0, 
             __title: std::convert::Into::into($title), 
             // initialize fields with builder pattern using given arguments
             $($id: {
-                type __Builder = <$type as $crate::input::Field>::Builder;
-                
-                let builder = <__Builder as std::default::Default>::default()
+                let builder = <$type as $crate::field::Field>::builder()
                 $(
                     .$arg_id($($arg_val)?)
                 )*;
-                $crate::input::Build::build(builder)
+                builder.build()
             },)*
         };
         $crate::dialog::form::internal::Form::run_over(__form, $bg, $ctx, __validate)
@@ -314,35 +296,46 @@ macro_rules! form {
 pub mod internal {
     use std::{io, iter};
     use ratatui::{
-        text::{Line, Span}, 
+        text::{Span, Line}, 
         style::{Style, Stylize}, 
     };
     use crate::{
         dialog::{self, *}, 
-        input::Field, 
+        field::InputResult, 
     };
 
-    pub trait Form {
+    pub trait Form: Sized {
         type Values;
         type BorrowedValues<'a> where Self: 'a;
+
+        fn title(&self) -> &str;
+
+        fn max_focus(&self) -> usize;
+
+        fn focus(&self) -> usize;
+        fn set_focus(&mut self, focus: usize);
 
         fn into_values(self) -> Self::Values;
         fn values<'a>(&'a self) -> Self::BorrowedValues<'a>;
 
+        fn input_dispatch(&mut self, key: KeyEvent) -> InputResult;
+        fn format_dispatch(&self) -> Vec<Text>;
+
         fn run_over<G, T, U, V>(mut self, bg: &T, ctx: &mut Context<G>, mut validate: U)
             -> io::Result<Option<Self::Values>>
         where
-            Self: Dialog, 
             T: State, 
             U: FnMut(Self::BorrowedValues<'_>) -> std::result::Result<(), V>, 
             V: AsRef<str>, 
         {
             Ok(loop {
+                let dialog = FormDialog(self);
+
                 // run form dialog; if the user cancels, exit immediately
-                let Some(out) = Dialog::run_over(self, bg, ctx)? else {
+                let Some(out) = dialog.run_over(bg, ctx)? else {
                     break None
                 };
-                self = out;
+                self = out.0;
 
                 match validate(self.values()) {
                     Ok(_) => break Some(self.into_values()), 
@@ -352,12 +345,53 @@ pub mod internal {
         }
     }
 
-    pub fn format_field(field: &impl Field, selected: bool, align_to: usize) -> Line {
-        let (delimiter, style) = match selected {
+    struct FormDialog<T>(T);
+
+    impl<T: Form> Dialog for FormDialog<T> {
+        fn format(&self) -> DrawInfo {
+            let body: Vec<Line> = self.0.format_dispatch()
+                .into_iter()
+                .flat_map(|body| body.lines)
+                .collect();
+            DrawInfo {
+                title: self.0.title().into(), 
+                body: body.into(), 
+                hint: "Press (enter) to submit, (esc) to cancel...".into(), 
+                wrap: None, 
+                ..Default::default()
+            }
+        }
+
+        fn input(&mut self, key: KeyEvent) -> Signal {
+            match key.code {
+                KeyCode::Esc => Signal::Cancelled, 
+                KeyCode::Enter => Signal::Done, 
+                _ => {
+                    let dispatch_result = self.0.input_dispatch(key);
+                    let focus = self.0.focus();
+    
+                    match (dispatch_result, key.code) {
+                        (InputResult::Ignored, KeyCode::Up) => {
+                            self.0.set_focus(focus.saturating_sub(1));
+                        }
+                        (InputResult::Ignored, KeyCode::Down) => {
+                            let focus = usize::min(focus + 1, self.0.max_focus());
+                            self.0.set_focus(focus);
+                        }
+                        _ => (), 
+                    };
+                    Signal::Running
+                }
+            }
+        }
+    }
+
+    pub fn format_field<'a>(name: &str, mut body: Text<'a>, focused: bool, align_to: usize) -> Text<'a> {
+        let (delimiter, style) = match focused {
             true => (" : ", Style::new().bold()),
             false => (" │ ", Style::new()),
         };
-        let name = field.name();
+
         let padding = align_to.saturating_sub(name.len());
         let title: String = iter::repeat(' ')
             .take(padding)
@@ -365,15 +399,22 @@ pub mod internal {
             .chain(delimiter.chars())
             .collect();
         let title = Span::styled(title, style);
-        let mut body = field.format(selected);
-        body.spans.insert(0, title);
+
+        let mut lines = body.lines.iter_mut();
+
+        if let Some(first) = lines.next() {
+            first.spans.insert(0, title);
+        }
+        
+        for line in lines {
+            let indent: String = iter::repeat(' ')
+                .take(align_to)
+                .chain(delimiter.chars())
+                .collect();
+            line.spans.insert(0, indent.into())
+        }
         body
     }
 }
 
 pub use form;
-
-#[cfg(test)]
-mod test {
-    
-}

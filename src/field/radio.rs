@@ -3,7 +3,8 @@ use ratatui::text::{Text, Line};
 use crate::prelude::*;
 use super::{*, builder::*};
 
-/// An input [field](super) for selecting one item among a set. 
+/// An [input field](super) for selecting one item among a set. See [`radio::Builder`] for the methods
+/// available when constructing the field. 
 /// 
 /// The value is the index of the selected item. 
 /// 

@@ -3,7 +3,8 @@ use ratatui::text::Text;
 use crate::prelude::*;
 use super::{*, builder::*};
 
-/// An input [field](super) for entering a boolean value. 
+/// An [input field](super) for entering a boolean value. See [`checkbox::Builder`] for the methods available
+/// when constructing the field. 
 /// 
 /// 
 /// # Key bindings

@@ -11,7 +11,8 @@ use ratatui::{
 use crate::prelude::*;
 use super::{*, builder::*};
 
-/// An input [field](super) for entering a numerical value. 
+/// An [input field](super) for entering a numerical value. See [`slider::Builder`] for the methods available
+/// when constructing the field. 
 /// 
 /// The type parameter `T` is the type of the value being entered. The following bounds are placed on `T`: 
 /// ```text

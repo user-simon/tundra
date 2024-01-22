@@ -3,7 +3,8 @@ use ratatui::text::{Text, Line};
 use crate::prelude::*;
 use super::{*, builder::*};
 
-/// An input [field](super) for toggling a set of items on/off. 
+/// An [input field](super) for toggling a set of items on/off. See [`toggle::Builder`] for the methods
+/// available when constructing the field. 
 /// 
 /// The value is an array of booleans --- one for each item --- indicating whether the item corresponding to
 /// each index is toggled. 

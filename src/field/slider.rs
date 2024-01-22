@@ -159,8 +159,18 @@ impl<T, const NAME: bool> Builder<T, NAME> {
     }
 
     /// The allowed range of the value that can be entered. 
-    pub fn range(self, range: RangeInclusive<T>) -> Self {
-        Builder(Slider{ range, ..self.0 })
+    pub fn range(self, range: RangeInclusive<T>) -> Self
+    where
+        T: Clone + PartialOrd
+    {
+        let (min, max) = range.clone().into_inner();
+        let value = self.0.value.clone();
+        let value = match (value < min, value > max) {
+            (true, _) => min, 
+            (_, true) => max, 
+            (_, _) => value, 
+        };
+        Builder(Slider{ range, ..self.0 }).value(value)
     }
 
     /// The amount that is added to or subtracted from the value. 

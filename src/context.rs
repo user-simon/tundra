@@ -28,8 +28,8 @@ type Environment = Terminal;
 /// 
 /// In addition to managing the terminal environment, the context also provides the utility of a global 
 /// value, which can be whatever makes sense in the application. Suitable examples include configuration 
-/// data or user information. The global will then available via the [`global`](Context::global) field of the 
-/// context for all states ran with it. 
+/// data or user information. The global will then be available via the [`global`](Context::global) field of
+/// the context for all states ran with it. 
 /// 
 /// Note that this is purely opt-in; for applications where no global data is necessary, `()` may be used, 
 /// which is the default. 
@@ -47,8 +47,8 @@ type Environment = Terminal;
 /// Chaining may be useful where there are distinct clusters of states in an application, with each cluster
 /// having its own associated global. 
 /// 
-/// ⚠️ Creating several context instances using [`Context::new`] or [`Context::with_global`] should generally be
-/// avoided. 
+/// ⚠️ Creating several context instances using [`Context::new`] or [`Context::with_global`] should generally
+/// be avoided. 
 /// 
 /// 
 /// # Custom Panic Handler
@@ -63,26 +63,44 @@ type Environment = Terminal;
 /// Creating a context without global data: 
 /// ```
 /// # use tundra::Context;
-/// let context = Context::new()?;
+/// let ctx = Context::new()?;
 /// # Ok::<(), std::io::Error>(())
 /// ```
 /// 
-/// Creating a context with global data: 
+/// Creating a context with global user data: 
 /// ```
 /// # use tundra::Context;
-/// struct Config {
-///     foo: bool, 
-///     bar: String, 
+/// struct User {
+///     name: String, 
+///     id: u32, 
 /// }
 /// 
-/// let config = Config {
-///     foo: true, 
-///     bar: "Hello world".into(), 
+/// let user = User {
+///     name: "Don Hertzfeldt".into(), 
+///     id: 2012, 
 /// };
-/// let context = Context::with_global(config)?;
+/// let ctx = Context::with_global(user)?;
+/// 
+/// // the global can now be retrieved as: 
+/// let user: &User = &ctx.global;
 /// # Ok::<(), std::io::Error>(())
 /// ```
-#[derive(Clone)]
+/// 
+/// "Removing" the global from an existing context: 
+/// ```
+/// # use std::path::PathBuf;
+/// # use tundra::Context;
+/// let cache_dir = "~/.cache/svalbard/".into();
+/// 
+/// let old: Context<PathBuf> = Context::with_global(cache_dir)?;
+/// let new: Context<()> = old.chain_without_global();
+/// 
+/// // old context still available!
+/// # let do_something = |_| ();
+/// do_something(old);
+/// # Ok::<(), std::io::Error>(())
+/// ```
+#[derive(Clone, Debug)]
 pub struct Context<G = ()> {
     /// Application-defined global value. See the [context documentation](Context#application-defined-global)
     /// for more information. 
@@ -122,10 +140,12 @@ impl<G> Context<G> {
     /// # Examples
     /// 
     /// ```
-    /// # use tundra::{Context, Terminal};
+    /// use ratatui::{Terminal, layout::Rect};
+    /// 
+    /// # use tundra::Context;
     /// # let ctx = Context::new().unwrap();
     /// // let ctx: &Context<_>
-    /// let size = ctx.apply(Terminal::size)?;
+    /// let size: Rect = ctx.apply(Terminal::size)?;
     /// # Ok::<(), std::io::Error>(())
     /// ```
     pub fn apply<T>(&self, f: impl FnOnce(&Terminal) -> T) -> T {
@@ -146,7 +166,9 @@ impl<G> Context<G> {
     /// # Examples
     /// 
     /// ```
-    /// # use tundra::{Context, Terminal};
+    /// use ratatui::Terminal;
+    /// # use tundra::Context;
+    /// 
     /// # let mut ctx = Context::new().unwrap();
     /// // let ctx: &mut Context<_>
     /// ctx.apply_mut(Terminal::clear)?;
@@ -226,6 +248,7 @@ mod managed {
     use super::{Terminal, Backend};
 
     /// RAII wrapper over [`Terminal`] to initialize/reset the terminal environment. 
+    #[derive(Debug)]
     pub struct Environment(pub Terminal);
 
     impl Environment {

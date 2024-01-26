@@ -279,3 +279,10 @@ impl<T> ResultLike<T> for Option<T> {
         self.ok_or(())
     }
 }
+
+/// A type with no valid values. 
+/// 
+/// Defined to be used as [`State::Error`] type for infallible states. To be replaced with the `!` primitive
+/// once stabilised. 
+#[derive(Clone, Copy, Debug)]
+pub enum Never {}

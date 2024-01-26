@@ -171,8 +171,7 @@
 //! # let ctx = &mut Context::new().unwrap();
 //! // let current_state: &impl State
 //! // let ctx: &mut Context<_>
-//! dialog::error("Failed evicting tenant.", current_state, ctx)?;
-//! # Ok::<(), std::io::Error>(())
+//! dialog::error("Failed evicting tenant.", current_state, ctx);
 //! ```
 //! 
 //! Here, `current_state` is a reference to whatever state the dialog should be drawn over. If the dialog is
@@ -210,14 +209,13 @@
 //!     [title]: "Register Rent Unit", 
 //!     [context]: ctx, 
 //!     [background]: current_state, 
-//! }?;
+//! };
 //! 
 //! if let Some(values) = values {
 //!     let location: String = values.location;
 //!     let rent: u32 = values.rent;
 //!     let pets_allowed: bool = values.pets_allowed;
 //! }
-//! # Ok::<(), std::io::Error>(())
 //! ```
 //! 
 //! Some notes about the example: 

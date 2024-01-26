@@ -194,7 +194,7 @@
 //! 
 //! User input is facilitated through the [form macro](dialog::form!), which displays a dialog containing a
 //! specified set of [input fields](field). The return value of the macro invocation is a struct containing 
-//! the values entered by the user for each field. Here is an example of showing a form, and once its been
+//! the values entered by the user for each field. Here is an example of showing a form, and once it's been
 //! submitted, retrieving the entered values: 
 //! ```no_run
 //! # use tundra::{prelude::*, field::*};

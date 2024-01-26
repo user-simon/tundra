@@ -39,8 +39,9 @@ custom dialogs.
 ## 🕹️ User Input
 
 User input is facilitated through a macro that displays a form with specified fields inside a dialog. The 
-return value of the macro invocation is a struct containing the values entered by the user for each field. Both the values and the fields are stored as members of unspellable structs created inside the macro — 
-no runtime lookup is required! Here is an example of showing such a form: 
+return value of the macro invocation is a struct containing the values entered by the user for each field.
+Both the values and the fields are stored as members of unspellable structs created inside the macro — no
+runtime lookup is required! Here is an example of such a form: 
 
 ![dialog form demo](img/dialog_form.png)
 

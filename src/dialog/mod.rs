@@ -256,7 +256,7 @@ fn draw_dialog<'a>(info: DrawInfo<'a>, frame: &mut Frame) {
 
     // draw box and compute its inner area
     let inner_area = {
-        let inner_height = body_height + hint_height + 1;
+        let inner_height = body_height + hint_height + 2;
         let title = create_title(title);
         let block = create_block()
             .title(title)
@@ -268,10 +268,20 @@ fn draw_dialog<'a>(info: DrawInfo<'a>, frame: &mut Frame) {
         );
 
         let Rect{ width: frame_width, height: frame_height, .. } = frame_size;
-        let outer_area = frame_size.inner(&Margin {
-            horizontal: frame_width.saturating_sub(outer_width) / 2,
-            vertical: frame_height.saturating_sub(outer_height) / 2,
+        let [delta_width, delta_height] = [
+            frame_width.saturating_sub(outer_width), 
+            frame_height.saturating_sub(outer_height), 
+        ];
+        let mut outer_area = frame_size.inner(&Margin {
+            horizontal: delta_width / 2,
+            vertical: delta_height / 2,
         });
+
+        // if the delta height is odd, the margin will be 0.5 too small on both the top and bottom. to
+        // account for this, we remove 1 from the dialog height -- basically rounding the top margin down and
+        // the bottom margin up
+        outer_area.height -= delta_height & 1;
+
         let inner_area = block.inner(outer_area);
 
         frame.render_widget(Clear, outer_area);

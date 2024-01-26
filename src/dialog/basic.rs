@@ -8,6 +8,8 @@
 //! - [`dialog::fatal`] displays a fatal error. 
 
 use std::io;
+use ratatui::text::Line;
+
 use super::*;
 
 /// Displays a yellow dialog asking the user to confirm an action before proceeding. 
@@ -21,6 +23,23 @@ pub fn confirm<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>)
     Confirm{ msg: msg.as_ref() }
         .run_over(over, ctx)
         .map(|x| x.is_some())
+}
+
+/// Displays a blue dialog asking the user to select one action among a set. 
+/// 
+/// 
+/// # Returns
+/// 
+/// - The selected index if the user pressed `enter`. 
+/// - `None` if the user pressed `escape`. 
+pub fn select<'a, T, U, G>(actions: T, over: &impl State, ctx: &mut Context<G>) -> io::Result<Option<usize>>
+where
+    T: AsRef<[U]>, 
+    U: AsRef<str>, 
+{
+    Select{ actions: actions.as_ref(), selected: 0 }
+        .run_over(over, ctx)
+        .map(|x| x.map(|x| x.selected))
 }
 
 /// Displays a blue dialog showing a message. 
@@ -111,6 +130,54 @@ impl Dialog for Confirm<'_> {
             KeyCode::Esc       |
             KeyCode::Char('n') |
             KeyCode::Char('N') => Signal::Cancelled, 
+            _ => Signal::Running, 
+        }
+    }
+}
+
+/// Dialog to select one action among a set. 
+struct Select<'a, T> {
+    actions: &'a [T], 
+    selected: usize, 
+}
+
+impl<'a, T: AsRef<str>> Dialog for Select<'a, T> {
+    fn format(&self) -> DrawInfo {
+        let format_action = |(i, action)| {
+            let prefix = match i == self.selected {
+                true => '→', 
+                false => ' ', 
+            };
+            format!("{prefix} {action}").into()
+        };
+        let body: Vec<Line> = self.actions
+            .iter()
+            .map(AsRef::as_ref)
+            .enumerate()
+            .map(format_action)
+            .collect();
+        DrawInfo {
+            title: "Select".into(), 
+            color: Color::Cyan, 
+            body: body.into(), 
+            hint: "Press (enter) to select action, (esc) to cancel...".into(), 
+            wrap: Some(Wrap{ trim: false }), 
+            ..Default::default()
+        }
+    }
+
+    fn input(&mut self, key: KeyEvent) -> Signal {
+        match key.code {
+            KeyCode::Up => {
+                self.selected = self.selected.saturating_sub(1);
+                Signal::Running
+            } 
+            KeyCode::Down => {
+                self.selected = usize::min(self.selected + 1, self.actions.len() - 1);
+                Signal::Running
+            } 
+            KeyCode::Esc => Signal::Cancelled, 
+            KeyCode::Enter => Signal::Done, 
             _ => Signal::Running, 
         }
     }

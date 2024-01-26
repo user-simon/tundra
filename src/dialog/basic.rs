@@ -2,6 +2,7 @@
 //! 
 //! The following dialogs are defined in this module: 
 //! - [`dialog::confirm`] asks the user to confirm an action before proceeding. 
+//! - [`dialog::select`] asks the user to select one action among a set. 
 //! - [`dialog::info`] displays a message. 
 //! - [`dialog::warning`] displays a warning. 
 //! - [`dialog::error`] displays an error. 
@@ -69,42 +70,6 @@ fn message<G>(msg: &str, level: MessageLevel, over: &impl State, ctx: &mut Conte
     Message{ msg, level }
         .run_over(over, ctx)
         .map(|_| ())
-}
-
-/// Defines the title and colour of a [`Message`] dialog. 
-enum MessageLevel {
-    Info, 
-    Warning, 
-    Error, 
-    Fatal, 
-}
-
-/// Dialog to simply show a message to the user. 
-struct Message<'a> {
-    msg: &'a str, 
-    level: MessageLevel, 
-}
-
-impl Dialog for Message<'_> {
-    fn format(&self) -> DrawInfo {
-        let (title, color) = match self.level {
-            MessageLevel::Info    => ("Info",        Color::Cyan), 
-            MessageLevel::Warning => ("Warning",     Color::Yellow), 
-            MessageLevel::Error   => ("Error",       Color::Red), 
-            MessageLevel::Fatal   => ("Fatal error", Color::Red), 
-        };
-        DrawInfo {
-            title: title.into(), 
-            color, 
-            body: self.msg.into(), 
-            hint: "Press any key to continue...".into(), 
-            ..Default::default()
-        }
-    }
-
-    fn input(&mut self, _key: KeyEvent) -> Signal {
-        Signal::Done
-    }
 }
 
 /// Dialog to confirm an action before proceeding. 
@@ -180,5 +145,41 @@ impl<'a, T: AsRef<str>> Dialog for Select<'a, T> {
             KeyCode::Enter => Signal::Done, 
             _ => Signal::Running, 
         }
+    }
+}
+
+/// Defines the title and colour of a [`Message`] dialog. 
+enum MessageLevel {
+    Info, 
+    Warning, 
+    Error, 
+    Fatal, 
+}
+
+/// Dialog to simply show a message to the user. 
+struct Message<'a> {
+    msg: &'a str, 
+    level: MessageLevel, 
+}
+
+impl Dialog for Message<'_> {
+    fn format(&self) -> DrawInfo {
+        let (title, color) = match self.level {
+            MessageLevel::Info    => ("Info",        Color::Cyan), 
+            MessageLevel::Warning => ("Warning",     Color::Yellow), 
+            MessageLevel::Error   => ("Error",       Color::Red), 
+            MessageLevel::Fatal   => ("Fatal error", Color::Red), 
+        };
+        DrawInfo {
+            title: title.into(), 
+            color, 
+            body: self.msg.into(), 
+            hint: "Press any key to continue...".into(), 
+            ..Default::default()
+        }
+    }
+
+    fn input(&mut self, _key: KeyEvent) -> Signal {
+        Signal::Done
     }
 }

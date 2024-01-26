@@ -161,8 +161,8 @@ pub struct DrawInfo<'a> {
     /// Width of the dialog as a percentage (between `0` and `100`) of the total width of the terminal. 
     /// Default: `50`. 
     pub width_percentage: u8, 
-    /// Settings used to wrap the hint and body [`Paragraph`]s. Set to `None` to disable wrapping. Default: 
-    /// uses wrapping with [`Wrap::trim`] set to true. 
+    /// Settings used to wrap the body [`Paragraph`]. Set to `None` to disable wrapping. Default: uses
+    /// wrapping with [`Wrap::trim`] set to true. 
     pub wrap: Option<Wrap>, 
     /// Function constructing a [`Title`] from a string. Default: turns the title uppercase and inserts a
     /// space on either side of it. 
@@ -239,12 +239,13 @@ fn draw_dialog<'a>(info: DrawInfo<'a>, frame: &mut Frame) {
         create_block, 
     } = info;
 
-    let wrap = |p: Paragraph<'a>| match wrap {
-        Some(wrap) => p.wrap(wrap), 
-        None => p, 
+    let body = match (wrap, Paragraph::new(body)) {
+        (Some(wrap), body) => body.wrap(wrap), 
+        (None, body) => body, 
     };
-    let body = wrap(Paragraph::new(body));
-    let hint = wrap(Paragraph::new(hint)).italic();
+    let hint = Paragraph::new(hint)
+        .wrap(Wrap{ trim: true })
+        .italic();
 
     let frame_size = frame.size();
     let inner_width = (frame_size.width * width_percentage as u16) / 100;

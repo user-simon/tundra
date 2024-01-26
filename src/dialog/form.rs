@@ -332,14 +332,14 @@ pub mod internal {
                 let dialog = FormDialog(self);
 
                 // run form dialog; if the user cancels, exit immediately
-                let Some(out) = dialog.run_over(bg, ctx)? else {
+                let Some(out) = dialog.run_over(bg, ctx) else {
                     break None
                 };
                 self = out.0;
 
                 match validate(self.values()) {
                     Ok(_) => break Some(self.into_values()), 
-                    Err(e) => dialog::error(e, bg, ctx)?, 
+                    Err(e) => dialog::error(e, bg, ctx), 
                 }
             })
         }

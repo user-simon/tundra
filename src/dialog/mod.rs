@@ -30,7 +30,7 @@
 mod basic;
 pub mod form;
 
-use std::{io, borrow::Cow};
+use std::borrow::Cow;
 use ratatui::{
     Frame, 
     style::{Color, Stylize}, 
@@ -38,7 +38,7 @@ use ratatui::{
     widgets::{*, block::Title}, 
     layout::{Rect, Layout, Constraint, Margin}, 
 };
-use crate::prelude::*;
+use crate::{prelude::*, Never};
 
 pub use basic::*;
 pub use form::form;
@@ -112,10 +112,14 @@ pub trait Dialog: Sized {
     /// 
     /// This is a wrapper over [`State::run`] with added logic to draw the dialog box and background
     /// state. 
-    fn run_over<G>(self, background: &impl State, ctx: &mut Context<G>) -> io::Result<Option<Self>> {
-        Container{ content: self, background }
-            .run(&mut ctx.chain_without_global())
-            .map(|x| x.map(|x| x.content))
+    fn run_over<G>(self, background: &impl State, ctx: &mut Context<G>) -> Option<Self> {
+        // TODO replace with `let Ok(state) = ...` once stabilised
+        let result = Container{ content: self, background }
+            .run(&mut ctx.chain_without_global());
+        match result {
+            Ok(x) => x.map(|x| x.content), 
+            Err(_) => unreachable!("Never type cannot be constructed")
+        }
     }
 }
 
@@ -209,7 +213,7 @@ struct Container<'a, T, U> {
 }
 
 impl<T: Dialog, U: State> State for Container<'_, T, U> {
-    type Error = io::Error;
+    type Error = Never;
     type Global = ();
 
     fn draw(&self, frame: &mut Frame) {
@@ -220,7 +224,7 @@ impl<T: Dialog, U: State> State for Container<'_, T, U> {
         draw_dialog(draw_info, frame)
     }
 
-    fn input(&mut self, key: KeyEvent, _ctx: &mut Context) -> io::Result<Signal> {
+    fn input(&mut self, key: KeyEvent, _ctx: &mut Context) -> Result<Signal, Never> {
         Ok(self.content.input(key))
     }
 }

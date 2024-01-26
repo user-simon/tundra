@@ -1,4 +1,3 @@
-use std::io;
 use crossterm::event::{self, Event};
 use crate::prelude::*;
 
@@ -92,9 +91,8 @@ pub enum Signal {
 /// }
 /// ```
 pub trait State: Sized {
-    /// Type of error that can occur. Drawing to the terminal can cause an `io::Error` so the error type must
-    /// be able to handle that. 
-    type Error: From<io::Error>;
+    /// Type of error that can occur. If running the state is infallible, set this to the [`Never`] type. 
+    type Error;
 
     /// Type of the application-defined global inside [`Context`]. This should be set to the same type as the
     /// one used when initializing the [`Context`]. If no global is used, this may be set to `()`. 
@@ -142,11 +140,15 @@ pub trait State: Sized {
     /// 
     /// Calls [`State::draw`] and [`State::event`] until the latter returns [`Signal::Done`] or
     /// [`Signal::Cancelled`]. 
+    /// 
+    /// 
+    /// # Panics
+    /// 
+    /// When [`ratatui::Terminal::draw`] or [`crossterm::event::read`](event::read()) fails. 
     fn run(mut self, ctx: &mut Context<Self::Global>) -> Result<Option<Self>, Self::Error> {
         loop {
-            ctx.draw_state(&self)?;
-
-            let event = event::read()?;
+            ctx.draw_state(&self).unwrap();
+            let event = event::read().unwrap();
             
             match self.event(event, ctx)? {
                 Signal::Done      => break Ok(Some(self)),
@@ -163,14 +165,21 @@ pub trait State: Sized {
 /// This is useful when a state is expected but not used; e.g. if you want to display a [`dialog`] without a
 /// background. 
 impl State for () {
-    type Error = io::Error;
+    type Error = Never;
     type Global = ();
 
     fn draw(&self, _frame: &mut Frame) {
         ()
     }
 
-    fn input(&mut self, _key: KeyEvent, _ctx: &mut Context) -> io::Result<Signal> {
+    fn input(&mut self, _key: KeyEvent, _ctx: &mut Context) -> Result<Signal, Never> {
         Ok(Signal::Done)
     }
 }
+
+/// A type with no valid values. 
+/// 
+/// Defined to be used as [`State::Error`] type for infallible states. To be replaced with the `!` primitive
+/// once stabilised. 
+#[derive(Clone, Copy, Debug)]
+pub enum Never {}

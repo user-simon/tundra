@@ -239,6 +239,7 @@ fn draw_dialog<'a>(info: DrawInfo<'a>, frame: &mut Frame) {
         create_block, 
     } = info;
 
+    // create body and hint paragraphs
     let body = match (wrap, Paragraph::new(body)) {
         (Some(wrap), body) => body.wrap(wrap), 
         (None, body) => body, 
@@ -247,16 +248,16 @@ fn draw_dialog<'a>(info: DrawInfo<'a>, frame: &mut Frame) {
         .wrap(Wrap{ trim: true })
         .italic();
 
+    // compute the required inner dimensions
     let frame_size = frame.size();
     let inner_width = (frame_size.width * width_percentage as u16) / 100;
-
     let [hint_height, body_height] = [&hint, &body].map(|x|
         x.line_count(inner_width) as u16
     );
+    let inner_height = body_height + 2 + hint_height; // 2 spaces between body and hint
 
-    // draw box and compute its inner area
+    // draw box and compute its actual inner area
     let inner_area = {
-        let inner_height = body_height + hint_height + 2;
         let title = create_title(title);
         let block = create_block()
             .title(title)
@@ -266,11 +267,9 @@ fn draw_dialog<'a>(info: DrawInfo<'a>, frame: &mut Frame) {
             inner_width + inner_margin_x * 2, 
             inner_height + inner_margin_y * 2, 
         );
-
-        let Rect{ width: frame_width, height: frame_height, .. } = frame_size;
         let [delta_width, delta_height] = [
-            frame_width.saturating_sub(outer_width), 
-            frame_height.saturating_sub(outer_height), 
+            frame_size.width.saturating_sub(outer_width), 
+            frame_size.height.saturating_sub(outer_height), 
         ];
         let mut outer_area = frame_size.inner(&Margin {
             horizontal: delta_width / 2,

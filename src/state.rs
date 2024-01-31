@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use crossterm::event::{self, Event};
 use crate::prelude::*;
 
@@ -32,7 +34,19 @@ pub enum Signal {
 /// state, runs it, and then returns whether the user pressed `y` or `n`. 
 /// 
 /// 
-/// # Dummy State
+/// # Error Handling
+/// 
+/// Arbitrary application-defined errors are supported through the [`State::Result`] type. Errors can be
+/// returned from [`State::input`] or [`State::event`], and are propogated through [`State::run`]. 
+/// 
+/// Requiring a result type as opposed to an error type (which is generally standard practice) allows states
+/// to accept types that aren't results, but can *behave* like results. Most prominently: `Option<T>` and
+/// `T` itself. The latter case is especially interesting since it allows states for which no error can occur
+/// to be implemented without any mention of [`Result`] or [`Infallible`] trickery --- all return values are
+/// implicitly `Ok`. 
+/// 
+/// 
+/// # Dummy state
 /// 
 /// A dummy (or no-nop) state is implemented through `()`. This is useful when a state is expected but not
 /// used; e.g. to display a [`dialog`] without a background. 
@@ -62,7 +76,7 @@ pub enum Signal {
 /// }
 /// 
 /// impl State for Counter {
-///     type Error = io::Error;
+///     type Result<T> = T;
 ///     type Global = ();
 ///     
 ///     fn draw(&self, frame: &mut Frame) {
@@ -70,24 +84,23 @@ pub enum Signal {
 ///         frame.render_widget(widget, frame.size());
 ///     }
 ///     
-///     fn input(&mut self, key: KeyEvent, ctx: &mut Context) -> io::Result<Signal> {
+///     fn input(&mut self, key: KeyEvent, ctx: &mut Context) -> Signal {
 ///         match key.code {
 ///             KeyCode::Up    => self.value += 1, 
-///             KeyCode::Enter => return Ok(Signal::Done), 
-///             KeyCode::Esc   => return Ok(Signal::Cancelled), 
+///             KeyCode::Enter => return Signal::Done, 
+///             KeyCode::Esc   => return Signal::Cancelled, 
 ///             _ => (), 
 ///         }
-///         Ok(Signal::Running)
+///         Signal::Running
 ///     }
 /// }
 /// 
 /// // wrapper over `State::run` to return the entered value; a common pattern
-/// pub fn counter(ctx: &mut Context) -> io::Result<u32> {
-///     let counter = Counter{ value: 0 }.run(ctx)?;
-///     let value = counter
-///         .map(|c| c.value)
-///         .unwrap_or(0);
-///     Ok(value)
+/// pub fn counter(ctx: &mut Context) -> u32 {
+///     Counter{ value: 0 }
+///         .run(ctx)
+///         .map(|counter| counter.value)
+///         .unwrap_or(0)
 /// }
 /// ```
 pub trait State: Sized {
@@ -189,15 +202,15 @@ pub type StateError<S, T> = <<S as State>::Result<T> as ResultLike<T>>::Error;
 /// This is useful when a state is expected but not used; e.g. if you want to display a [`dialog`] without a
 /// background. 
 impl State for () {
-    type Error = Never;
+    type Result<T> = T;
     type Global = ();
 
     fn draw(&self, _frame: &mut Frame) {
         ()
     }
 
-    fn input(&mut self, _key: KeyEvent, _ctx: &mut Context) -> Result<Signal, Never> {
-        Ok(Signal::Done)
+    fn input(&mut self, _key: KeyEvent, _ctx: &mut Context) -> Signal {
+        Signal::Done
     }
 }
 

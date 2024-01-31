@@ -37,7 +37,7 @@ use ratatui::{
     widgets::{*, block::Title}, 
     layout::{Rect, Layout, Constraint, Margin}, 
 };
-use crate::{prelude::*, Never};
+use crate::prelude::*;
 
 pub use basic::*;
 pub use form::form;
@@ -56,7 +56,6 @@ pub use form::form;
 /// Creating a custom confirmation dialog (this is more or less the same as the one provided through 
 /// [`dialog::confirm`]): 
 /// ```no_run
-/// use std::io;
 /// use ratatui::style::Color;
 /// use tundra::{prelude::*, dialog::{Dialog, DrawInfo}};
 /// 
@@ -111,13 +110,9 @@ pub trait Dialog: Sized {
     /// This is a wrapper over [`State::run`] with added logic to draw the dialog box and background
     /// state. 
     fn run_over<G>(self, background: &impl State, ctx: &mut Context<G>) -> Option<Self> {
-        // TODO replace with `let Ok(state) = ...` once stabilised
-        let result = Container{ content: self, background }
-            .run(&mut ctx.chain_without_global());
-        match result {
-            Ok(x) => x.map(|x| x.content), 
-            Err(_) => unreachable!("Never type cannot be constructed")
-        }
+        Container{ content: self, background }
+            .run(&mut ctx.chain_without_global())
+            .map(|container| container.content)
     }
 }
 
@@ -211,7 +206,7 @@ struct Container<'a, T, U> {
 }
 
 impl<T: Dialog, U: State> State for Container<'_, T, U> {
-    type Error = Never;
+    type Result<V> = V;
     type Global = ();
 
     fn draw(&self, frame: &mut Frame) {
@@ -222,8 +217,8 @@ impl<T: Dialog, U: State> State for Container<'_, T, U> {
         draw_dialog(draw_info, frame)
     }
 
-    fn input(&mut self, key: KeyEvent, _ctx: &mut Context) -> Result<Signal, Never> {
-        Ok(self.content.input(key))
+    fn input(&mut self, key: KeyEvent, _ctx: &mut Context) -> Signal {
+        self.content.input(key)
     }
 }
 

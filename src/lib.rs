@@ -59,13 +59,12 @@
 //! To define the event loop of the state, implement the [`State`] trait. 
 //! 
 //! ```no_run
-//! use std::io;
 //! use ratatui::widgets::Paragraph;
 //! # use tundra::prelude::*;
 //! # struct Counter{ value: u32 };
 //! 
 //! impl State for Counter {
-//!     type Error = io::Error;
+//!     type Result<T> = T;
 //!     type Global = ();
 //! 
 //!     fn draw(&self, frame: &mut Frame) {
@@ -73,62 +72,60 @@
 //!         frame.render_widget(widget, frame.size());
 //!     }
 //! 
-//!     fn input(&mut self, key: KeyEvent, _ctx: &mut Context) -> io::Result<Signal> {
+//!     fn input(&mut self, key: KeyEvent, _ctx: &mut Context) -> Signal {
 //!         match key.code {
 //!             KeyCode::Up    => self.value += 1, 
-//!             KeyCode::Enter => return Ok(Signal::Done), 
-//!             KeyCode::Esc   => return Ok(Signal::Cancelled), 
+//!             KeyCode::Enter => return Signal::Done, 
+//!             KeyCode::Esc   => return Signal::Cancelled, 
 //!             _ => (), 
 //!         }
-//!         Ok(Signal::Running)
+//!         Signal::Running
 //!     }
 //! }
 //! ```
 //! 
 //! Some notes on the implementation: 
-//! - `Error` is used to specify the type of error that can occur. 
-//! - `Global` can be used to store a [global value inside the context](Context#application-defined-global). 
-//! - `draw` is used to draw the user interface using [Ratatui](ratatui). 
-//! - `input` is used to handle key press events. The [`Signal`] return value indicates to the event loop 
-//! when and what to return. 
+//! - [`Result`](State::Result) can be used to specify what can go wrong when running the state --- analogous
+//! to an error type but [more flexible](State#error-handling). 
+//! - [`Global`](State::Global) can be used to store a
+//! [global value inside the context](Context#application-defined-global). 
+//! - [`draw`](State::draw) is used to draw the user interface using [Ratatui](ratatui). 
+//! - [`input`](State::input) is used to handle key press events. The [`Signal`] return value indicates to
+//! the event loop when and what to return. 
 //! 
 //! Our counter can now be ran using [`State::run`]. Let's also extract the entered value from the counter
 //! after it's done running. 
 //! 
 //! ```no_run
-//! # use std::io;
 //! # use tundra::prelude::*;
 //! # struct Counter{ value: u32 };
 //! # impl Counter{
-//! #   fn run(self, _: &mut Context) -> io::Result<Option<Self>> { Ok(Some(self)) }
+//! #   fn run(self, _: &mut Context) -> Option<Self> { Some(self) }
 //! # }
 //! # let mut ctx = &mut Context::new().unwrap();
 //! // returns when the user presses enter or escape (per our State::input)
-//! let counter = Counter{ value: 0 }.run(ctx)?;
+//! let counter = Counter{ value: 0 }.run(ctx);
 //! 
 //! // the returned `counter` is `Some(Counter)` if enter was pressed, and `None` otherwise
 //! let value = counter
 //!     .map(|c| c.value)
 //!     .unwrap_or(0);
-//! # Ok::<(), std::io::Error>(())
 //! ```
 //! 
 //! This is a fair amount of boiler-plate to write each time the `Counter` state is ran, so let's create a 
 //! wrapper function that does this for us --- a common pattern! 
 //! 
 //! ```no_run
-//! # use std::io;
 //! # use tundra::prelude::*;
 //! # struct Counter{ value: u32 };
 //! # impl Counter{
-//! #   fn run(self, _: &mut Context) -> io::Result<Option<Self>> { Ok(Some(self)) }
+//! #   fn run(self, _: &mut Context) -> Option<Self> { Some(self) }
 //! # }
-//! pub fn counter(ctx: &mut Context) -> io::Result<u32> {
-//!     let counter = Counter{ value: 0 }.run(ctx)?;
-//!     let value = counter
-//!         .map(|c| c.value)
-//!         .unwrap_or(0);
-//!     Ok(value)
+//! pub fn counter(ctx: &mut Context) -> u32 {
+//!     Counter{ value: 0 }
+//!         .run(ctx)
+//!         .map(|counter| counter.value)
+//!         .unwrap_or(0)
 //! }
 //! ```
 //! 
@@ -138,20 +135,19 @@
 //! counter. 
 //! 
 //! ```no_run
-//! # use std::io;
 //! # use tundra::prelude::*;
-//! # fn counter(_: &mut Context) -> io::Result<u32> { Ok(0) }
+//! # fn counter(_: &mut Context) -> u32 { 0 }
 //! # struct Counter{ value: u32 };
 //! # impl Counter {
-//! fn input(&mut self, key: KeyEvent, ctx: &mut Context) -> io::Result<Signal> {
+//! fn input(&mut self, key: KeyEvent, ctx: &mut Context) -> Signal {
 //!     match key.code {
 //!         KeyCode::Up    => self.value += 1, 
-//!         KeyCode::Tab   => self.value += counter(ctx)?, 
-//!         KeyCode::Enter => return Ok(Signal::Done), 
-//!         KeyCode::Esc   => return Ok(Signal::Cancelled), 
+//!         KeyCode::Tab   => self.value += counter(ctx), 
+//!         KeyCode::Enter => return Signal::Done, 
+//!         KeyCode::Esc   => return Signal::Cancelled, 
 //!         _ => (), 
 //!     }
-//!     Ok(Signal::Running)
+//!     Signal::Running
 //! }
 //! # }
 //! ```
@@ -196,7 +192,9 @@
 //! the values entered by the user for each field. Here is an example of showing a form, and once it's been
 //! submitted, retrieving the entered values: 
 //! ```no_run
-//! # use tundra::{prelude::*, field::*};
+//! use tundra::field::*;
+//! # use tundra::{prelude::*};
+//! 
 //! # let current_state = &();
 //! # let ctx = &mut Context::new().unwrap();
 //! // let current_state: &impl State

@@ -91,8 +91,13 @@ pub enum Signal {
 /// }
 /// ```
 pub trait State: Sized {
-    /// Type of error that can occur. If running the state is infallible, set this to the [`Never`] type. 
-    type Error;
+    /// The result type, encoding what kinds of errors can occur when running the state: 
+    /// - `Result<T, E>` in cases where an exact error `E` can occur. 
+    /// - `Option<T>` in cases where the exact error is not important. 
+    /// - `T` in cases where no error can occur. 
+    /// 
+    /// See the [trait-level](State#error-handling) documentation for more information. 
+    type Result<T>: ResultLike<T>;
 
     /// Type of the application-defined global inside [`Context`]. This should be set to the same type as the
     /// one used when initializing the [`Context`]. If no global is used, this may be set to `()`. 
@@ -112,8 +117,8 @@ pub trait State: Sized {
     /// 
     /// Always returns [`Signal::Running`]. 
     #[allow(unused_variables)]
-    fn input(&mut self, key: KeyEvent, ctx: &mut Context<Self::Global>) -> Result<Signal, Self::Error> {
-        Ok(Signal::Running)
+    fn input(&mut self, key: KeyEvent, ctx: &mut Context<Self::Global>) -> Self::Result<Signal> {
+        ResultLike::from_result(Ok(Signal::Running))
     }
 
     /// Update the state with an event. 
@@ -125,11 +130,11 @@ pub trait State: Sized {
     /// 
     /// Simply delegates to [`State::input`], representing the most common use case. All other events are
     /// discarded. 
-    fn event(&mut self, event: Event, ctx: &mut Context<Self::Global>) -> Result<Signal, Self::Error> {
+    fn event(&mut self, event: Event, ctx: &mut Context<Self::Global>) -> Self::Result<Signal> {
         if let Event::Key(key_event) = event {
             self.input(key_event, ctx)
         } else {
-            Ok(Signal::Running)
+            ResultLike::from_result(Ok(Signal::Running))
         }
     }
 
@@ -145,19 +150,38 @@ pub trait State: Sized {
     /// # Panics
     /// 
     /// When [`ratatui::Terminal::draw`] or [`crossterm::event::read`](event::read()) fails. 
-    fn run(mut self, ctx: &mut Context<Self::Global>) -> Result<Option<Self>, Self::Error> {
-        loop {
+    fn run(mut self, ctx: &mut Context<Self::Global>) -> Self::Result<Option<Self>>
+    where
+        StateError<Self, Option<Self>>: From<StateError<Self, Signal>>
+    {
+        let result = loop {
+            // we're intentionally panicking on `io::Error`s here to simplify application code (we would
+            // otherwise have to force the application-defined error to implement `From<io::Error>`). 
+            // applications that wish to handle `io::Error` explicitly can override this function
             ctx.draw_state(&self).unwrap();
             let event = event::read().unwrap();
+
+            // generalized version of `let signal = self.event(...)?`
+            let signal = match ResultLike::into_result(self.event(event, ctx)) {
+                Ok(signal) => signal, 
+                Err(err) => break Err(err.into()), 
+            };
             
-            match self.event(event, ctx)? {
-                Signal::Done      => break Ok(Some(self)),
-                Signal::Cancelled => break Ok(None),
-                Signal::Running   => (),
+            match signal {
+                Signal::Done      => break Ok(Some(self)), 
+                Signal::Cancelled => break Ok(None), 
+                Signal::Running   => (), 
             }
-        }
+        };
+        ResultLike::from_result(result)
     }
 }
+
+/// Short-hand for the type of error that can occur in a [`State`]. 
+/// 
+/// This is parameterised over the state `S` and the value type `T` (corresponding to the `Ok` type of a
+/// result). 
+pub type StateError<S, T> = <<S as State>::Result<T> as ResultLike<T>>::Error;
 
 /// Implements a dummy (or no-op) [`State`] through `()`. It draws nothing and exits as soon as a key is
 /// pressed. 
@@ -177,9 +201,68 @@ impl State for () {
     }
 }
 
-/// A type with no valid values. 
+/// Generalization over data-carrying [`Result`]-like types. 
 /// 
-/// Defined to be used as [`State::Error`] type for infallible states. To be replaced with the `!` primitive
-/// once stabilised. 
-#[derive(Clone, Copy, Debug)]
-pub enum Never {}
+/// There are three significant implementations of this trait: 
+/// - `Result<T, E>` itself, which has error type `E`. 
+/// - `Option<T>`, which has error type `()`. 
+/// - `T`, which has error type [`Infallible`] (or `!` once stabilised). 
+/// 
+/// Either three of these can be used in place of an explicit [`Result`] where a [`ResultLike`] type is
+/// expected. This allows [`State`] to accept not only any error type (through `Result<T, E>`), but also the
+/// absence of an error type (through `Option<T>`), and the absence of an error altogether (through `T`). 
+/// 
+/// 
+/// # Limitations
+/// 
+/// There are limitations to this approach. Namely, it is very difficult to assert that [`State::Result`] has
+/// the same error type regardless of its value type `T` (as is true for all three implementations listed
+/// above). This means that to propogate an error from `State::Result<T>` to `State::Result<U>`, an explicit 
+/// bound to assert that the conversion between the two (ostensibly distinct) error types exists must be
+/// added. This is cumbersome for generic code (like the default implementation of [`State::run`]), but has
+/// no bearing on the concrete implementations of the states themselves. 
+pub trait ResultLike<T> {
+    type Error;
+
+    fn from_result(result: Result<T, Self::Error>) -> Self;
+    fn into_result(self) -> Result<T, Self::Error>;
+}
+
+impl<T> ResultLike<T> for T {
+    type Error = Infallible;
+
+    fn from_result(result: Result<T, Infallible>) -> T {
+        match result {
+            Ok(x) => x, 
+            Err(x) => match x {}
+        }
+    }
+
+    fn into_result(self) -> Result<T, Infallible> {
+        Ok(self)
+    }
+}
+
+impl<T, E> ResultLike<T> for Result<T, E> {
+    type Error = E;
+
+    fn from_result(result: Result<T, E>) -> Result<T, E> {
+        result
+    }
+
+    fn into_result(self) -> Result<T, E> {
+        self
+    }
+}
+
+impl<T> ResultLike<T> for Option<T> {
+    type Error = ();
+
+    fn from_result(result: Result<T, ()>) -> Option<T> {
+        result.ok()
+    }
+
+    fn into_result(self) -> Result<T, ()> {
+        self.ok_or(())
+    }
+}

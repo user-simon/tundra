@@ -107,14 +107,13 @@
 ///     [title]: "Register Rent Unit", 
 ///     [context]: ctx, 
 ///     [background]: current_state, 
-/// }?;
+/// };
 /// if let Some(values) = values {
 ///     // type annotation is not required
 ///     let location: String = values.location;
 ///     let rent: u32 = values.rent;
 ///     let pets_allowed: bool = values.pets_allowed;
 /// }
-/// # Ok::<(), std::io::Error>(())
 /// ```
 /// 
 /// To show a login prompt, checking the credentials before proceeding: 
@@ -137,12 +136,11 @@
 ///     } else {
 ///         Err("Invalid credentials. Try again.")
 ///     }
-/// }?;
+/// };
 /// match values {
 ///     Some(_) => { /* form submitted -> login success */ }
 ///     None => { /* form cancelled -> login failure */ }
 /// }
-/// # Ok::<(), std::io::Error>(())
 /// ```
 #[macro_export]
 macro_rules! form {
@@ -294,7 +292,7 @@ macro_rules! form {
 }
 
 pub mod internal {
-    use std::{io, iter};
+    use std::iter;
     use ratatui::{
         text::{Span, Line}, 
         style::{Style, Stylize}, 
@@ -322,26 +320,26 @@ pub mod internal {
         fn format_dispatch(&self) -> Vec<Text>;
 
         fn run_over<G, T, U, V>(mut self, bg: &T, ctx: &mut Context<G>, mut validate: U)
-            -> io::Result<Option<Self::Values>>
+            -> Option<Self::Values>
         where
             T: State, 
             U: FnMut(Self::BorrowedValues<'_>) -> std::result::Result<(), V>, 
             V: AsRef<str>, 
         {
-            Ok(loop {
+            loop {
                 let dialog = FormDialog(self);
 
                 // run form dialog; if the user cancels, exit immediately
-                let Some(out) = dialog.run_over(bg, ctx)? else {
+                let Some(out) = dialog.run_over(bg, ctx) else {
                     break None
                 };
                 self = out.0;
 
                 match validate(self.values()) {
                     Ok(_) => break Some(self.into_values()), 
-                    Err(e) => dialog::error(e, bg, ctx)?, 
+                    Err(e) => dialog::error(e, bg, ctx), 
                 }
-            })
+            }
         }
     }
 

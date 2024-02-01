@@ -8,9 +8,7 @@
 //! - [`dialog::error`] displays an error. 
 //! - [`dialog::fatal`] displays a fatal error. 
 
-use std::io;
 use ratatui::text::Line;
-
 use super::*;
 
 /// Displays a yellow dialog asking the user to confirm an action before proceeding. 
@@ -20,10 +18,10 @@ use super::*;
 /// 
 /// - `true` if the user pressed `y`. 
 /// - `false` if the user pressed `n` or `escape`. 
-pub fn confirm<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) -> io::Result<bool> {
+pub fn confirm<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) -> bool {
     Confirm{ msg: msg.as_ref() }
         .run_over(over, ctx)
-        .map(|x| x.is_some())
+        .is_some()
 }
 
 /// Displays a blue dialog asking the user to select one action among a set. 
@@ -33,43 +31,41 @@ pub fn confirm<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>)
 /// 
 /// - The selected index if the user pressed `enter`. 
 /// - `None` if the user pressed `escape`. 
-pub fn select<'a, T, U, G>(actions: T, over: &impl State, ctx: &mut Context<G>) -> io::Result<Option<usize>>
+pub fn select<'a, T, U, G>(actions: T, over: &impl State, ctx: &mut Context<G>) -> Option<usize>
 where
     T: AsRef<[U]>, 
     U: AsRef<str>, 
 {
     Select{ actions: actions.as_ref(), selected: 0 }
         .run_over(over, ctx)
-        .map(|x| x.map(|x| x.selected))
+        .map(|x| x.selected)
 }
 
 /// Displays a blue dialog showing a message. 
-pub fn info<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) -> io::Result<()> {
+pub fn info<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) {
     message(msg.as_ref(), MessageLevel::Info, over, ctx)
 }
 
 /// Displays a yellow dialog showing a warning. 
-pub fn warning<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) -> io::Result<()> {
+pub fn warning<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) {
     message(msg.as_ref(), MessageLevel::Warning, over, ctx)
 }
 
 /// Displays a red dialog showing an error message. 
-pub fn error<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) -> io::Result<()> {
+pub fn error<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) {
     message(msg.as_ref(), MessageLevel::Error, over, ctx)
 }
 
 /// Displays a red dialog showing a fatal error message. 
 /// 
 /// No background state is drawn upon displaying a fatal error message. 
-pub fn fatal<G>(msg: impl AsRef<str>, ctx: &mut Context<G>) -> io::Result<()> {
+pub fn fatal<G>(msg: impl AsRef<str>, ctx: &mut Context<G>) {
     message(msg.as_ref(), MessageLevel::Fatal, &(), ctx)
 }
 
 /// Displays a dialog showing a message of specified [level](MessageLevel). 
-fn message<G>(msg: &str, level: MessageLevel, over: &impl State, ctx: &mut Context<G>) -> io::Result<()> {
-    Message{ msg, level }
-        .run_over(over, ctx)
-        .map(|_| ())
+fn message<G>(msg: &str, level: MessageLevel, over: &impl State, ctx: &mut Context<G>) {
+    Message{ msg, level }.run_over(over, ctx);
 }
 
 /// Dialog to confirm an action before proceeding. 

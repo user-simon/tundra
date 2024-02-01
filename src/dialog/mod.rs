@@ -23,14 +23,13 @@
 //! # use tundra::prelude::*;
 //! # let ctx = &mut Context::new().unwrap();
 //! // let ctx: &mut Context<_>
-//! dialog::info("Shown without a background!", &(), ctx)?;
-//! # Ok::<(), std::io::Error>(())
+//! dialog::info("Shown without a background!", &(), ctx);
 //! ```
 
 mod basic;
 pub mod form;
 
-use std::{io, borrow::Cow};
+use std::borrow::Cow;
 use ratatui::{
     Frame, 
     style::{Color, Stylize}, 
@@ -57,7 +56,6 @@ pub use form::form;
 /// Creating a custom confirmation dialog (this is more or less the same as the one provided through 
 /// [`dialog::confirm`]): 
 /// ```no_run
-/// use std::io;
 /// use ratatui::style::Color;
 /// use tundra::{prelude::*, dialog::{Dialog, DrawInfo}};
 /// 
@@ -86,20 +84,19 @@ pub use form::form;
 /// }
 /// 
 /// // convenience wrapper over `Dialog::run_over`, providing a more bespoke interface
-/// fn confirm(msg: String, background: &impl State, ctx: &mut Context) -> io::Result<bool> {
+/// fn confirm(msg: String, background: &impl State, ctx: &mut Context) -> bool {
 ///     Confirm{ msg }
 ///         .run_over(background, ctx)
-///         .map(|x| x.is_some())
+///         .is_some()
 /// }
 /// 
 /// # let current_state = &();
-/// # let ctx = &mut Context::new()?;
+/// # let ctx = &mut Context::new().unwrap();
 /// // let current_state: &impl State
 /// // let ctx: &mut Context<_>
 /// 
 /// let msg = "Please confirm before proceeding";
-/// let confirmed: bool = confirm(msg.into(), current_state, ctx)?;
-/// # Ok::<(), io::Error>(())
+/// let confirmed: bool = confirm(msg.into(), current_state, ctx);
 /// ```
 pub trait Dialog: Sized {
     /// Defines the information needed to draw the dialog. See [`DrawInfo`] for the required fields. 
@@ -112,10 +109,10 @@ pub trait Dialog: Sized {
     /// 
     /// This is a wrapper over [`State::run`] with added logic to draw the dialog box and background
     /// state. 
-    fn run_over<G>(self, background: &impl State, ctx: &mut Context<G>) -> io::Result<Option<Self>> {
+    fn run_over<G>(self, background: &impl State, ctx: &mut Context<G>) -> Option<Self> {
         Container{ content: self, background }
             .run(&mut ctx.chain_without_global())
-            .map(|x| x.map(|x| x.content))
+            .map(|container| container.content)
     }
 }
 
@@ -209,7 +206,7 @@ struct Container<'a, T, U> {
 }
 
 impl<T: Dialog, U: State> State for Container<'_, T, U> {
-    type Error = io::Error;
+    type Result<V> = V;
     type Global = ();
 
     fn draw(&self, frame: &mut Frame) {
@@ -220,8 +217,8 @@ impl<T: Dialog, U: State> State for Container<'_, T, U> {
         draw_dialog(draw_info, frame)
     }
 
-    fn input(&mut self, key: KeyEvent, _ctx: &mut Context) -> io::Result<Signal> {
-        Ok(self.content.input(key))
+    fn input(&mut self, key: KeyEvent, _ctx: &mut Context) -> Signal {
+        self.content.input(key)
     }
 }
 

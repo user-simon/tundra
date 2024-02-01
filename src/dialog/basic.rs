@@ -3,6 +3,7 @@
 //! The following dialogs are defined in this module: 
 //! - [`dialog::confirm`] asks the user to confirm an action before proceeding. 
 //! - [`dialog::select`] asks the user to select one action among a set. 
+//! - [`dialog::select`] asks the user to select one action among a set. 
 //! - [`dialog::info`] displays a message. 
 //! - [`dialog::warning`] displays a warning. 
 //! - [`dialog::error`] displays an error. 

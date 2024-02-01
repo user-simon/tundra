@@ -4,14 +4,14 @@ use tundra::prelude::*;
 struct MyState;
 
 impl State for MyState {
-    type Error = io::Error;
+    type Result<T> = T;
     type Global = ();
 
     fn draw(&self, _frame: &mut Frame) {
         todo!("Draw the state using Ratatui")
     }
 
-    fn input(&mut self, _key: KeyEvent, _ctx: &mut Context) -> io::Result<Signal> {
+    fn input(&mut self, _key: KeyEvent, _ctx: &mut Context) -> Signal {
         todo!("Handle key press events")
     }
 }
@@ -19,7 +19,7 @@ impl State for MyState {
 fn main() -> io::Result<()> {
     let ctx = &mut Context::new()?;
     let state = MyState;
-    state.run(ctx)?;
+    state.run(ctx);
 
     Ok(())
 }

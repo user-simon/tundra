@@ -37,7 +37,7 @@ use ratatui::{
     widgets::{*, block::Title}, 
     layout::{Rect, Layout, Constraint, Margin}, 
 };
-use crate::{prelude::*, Never};
+use crate::prelude::*;
 
 pub use basic::*;
 pub use form::form;

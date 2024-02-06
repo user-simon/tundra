@@ -42,6 +42,18 @@ use crate::prelude::*;
 pub use basic::*;
 pub use form::form;
 
+/// Dialog analogue to [`state::Signal`](crate::state::Signal). 
+/// 
+/// This is defined separately from [`state::Signal`](crate::state::Signal) (the one defined in the prelude)
+/// since [`Dialog`] defines its own [`Out`](Dialog::Out) type. 
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+pub enum Signal<T: Dialog> {
+    /// The dialog should return with given value. 
+    Return(T::Out), 
+    /// The given dialog should continue running. 
+    Continue(T), 
+}
+
 /// Interface for content displayed inside a dialog. 
 /// 
 /// For most applications, the [library provided dialogs](dialog) should suffice, but custom dialogs may be
@@ -57,13 +69,15 @@ pub use form::form;
 /// [`dialog::confirm`]): 
 /// ```no_run
 /// use ratatui::style::Color;
-/// use tundra::{prelude::*, dialog::{Dialog, DrawInfo}};
+/// use tundra::{prelude::*, dialog::{Dialog, DrawInfo, Signal}};
 /// 
 /// struct Confirm {
 ///     msg: String, 
 /// }
 /// 
 /// impl Dialog for Confirm {
+///     type Out = bool;
+/// 
 ///     fn format(&self) -> DrawInfo {
 ///         DrawInfo {
 ///             title: "Confirm".into(), 
@@ -74,20 +88,18 @@ pub use form::form;
 ///         }
 ///     }
 /// 
-///     fn input(&mut self, key: KeyEvent) -> Signal {
+///     fn input(self, key: KeyEvent) -> Signal<Self> {
 ///         match key.code {
-///             KeyCode::Char('y') => Signal::Done,
-///             KeyCode::Char('n') => Signal::Cancelled,
-///             _ => Signal::Running,
+///             KeyCode::Char('y') => Signal::Return(true),
+///             KeyCode::Char('n') => Signal::Return(false),
+///             _ => Signal::Continue(self),
 ///         }
 ///     }
 /// }
 /// 
-/// // convenience wrapper over `Dialog::run_over`, providing a more bespoke interface
+/// // convenience wrapper over the dialog state
 /// fn confirm(msg: String, background: &impl State, ctx: &mut Context) -> bool {
-///     Confirm{ msg }
-///         .run_over(background, ctx)
-///         .is_some()
+///     Confirm{ msg }.run_over(background, ctx)
 /// }
 /// 
 /// # let current_state = &();
@@ -99,20 +111,23 @@ pub use form::form;
 /// let confirmed: bool = confirm(msg.into(), current_state, ctx);
 /// ```
 pub trait Dialog: Sized {
+    /// Type of the value to be returned from [`Dialog::run_over`] once the dialog has finished running. Th
+    /// value being returned is given by [`Signal::Return`] from [`Dialog::input`]. 
+    type Out;
+
     /// Defines the information needed to draw the dialog. See [`DrawInfo`] for the required fields. 
     fn format(&self) -> DrawInfo;
     
     /// Update the dialog with a key press input. 
-    fn input(&mut self, key: KeyEvent) -> Signal;
+    fn input(self, key: KeyEvent) -> Signal<Self>;
 
     /// Runs the dialog to fruition over some background state. 
     /// 
     /// This is a wrapper over [`State::run`] with added logic to draw the dialog box and background
     /// state. 
-    fn run_over<G>(self, background: &impl State, ctx: &mut Context<G>) -> Option<Self> {
+    fn run_over<G>(self, background: &impl State, ctx: &mut Context<G>) -> Self::Out {
         Container{ content: self, background }
             .run(&mut ctx.chain_without_global())
-            .map(|container| container.content)
     }
 }
 
@@ -194,6 +209,8 @@ impl<'a> Default for DrawInfo<'a> {
     }
 }
 
+type StateSignal<T> = super::state::Signal<T>;
+
 /// This represents the dialog box and serves as the common [`State`] implementation for all
 /// [dialogs](Dialog). 
 /// 
@@ -207,6 +224,7 @@ struct Container<'a, T, U> {
 
 impl<T: Dialog, U: State> State for Container<'_, T, U> {
     type Result<V> = V;
+    type Out = T::Out;
     type Global = ();
 
     fn draw(&self, frame: &mut Frame) {
@@ -217,8 +235,11 @@ impl<T: Dialog, U: State> State for Container<'_, T, U> {
         draw_dialog(draw_info, frame)
     }
 
-    fn input(&mut self, key: KeyEvent, _ctx: &mut Context) -> Signal {
-        self.content.input(key)
+    fn input(self, key: KeyEvent, _ctx: &mut Context) -> StateSignal<Self> {
+        match self.content.input(key) {
+            Signal::Return(out) => StateSignal::Return(out),
+            Signal::Continue(content) => StateSignal::Continue(Container{ content, ..self }),
+        }
     }
 }
 

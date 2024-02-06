@@ -346,6 +346,8 @@ pub mod internal {
     struct FormDialog<T>(T);
 
     impl<T: Form> Dialog for FormDialog<T> {
+        type Out = Option<Self>;
+
         fn format(&self) -> DrawInfo {
             let body: Vec<Line> = self.0.format_dispatch()
                 .into_iter()
@@ -360,10 +362,10 @@ pub mod internal {
             }
         }
 
-        fn input(&mut self, key: KeyEvent) -> Signal {
+        fn input(mut self, key: KeyEvent) -> Signal<Self> {
             match key.code {
-                KeyCode::Esc => Signal::Cancelled, 
-                KeyCode::Enter => Signal::Done, 
+                KeyCode::Esc => Signal::Return(None), 
+                KeyCode::Enter => Signal::Return(Some(self)), 
                 _ => {
                     let dispatch_result = self.0.input_dispatch(key);
                     let focus = self.0.focus();
@@ -378,7 +380,7 @@ pub mod internal {
                         }
                         _ => (), 
                     };
-                    Signal::Running
+                    Signal::Continue(self)
                 }
             }
         }

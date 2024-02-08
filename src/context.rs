@@ -10,9 +10,12 @@ use self::managed::Wrapper;
 pub type Backend = ratatui::backend::CrosstermBackend<io::Stdout>;
 pub type Terminal = ratatui::Terminal<Backend>;
 
+/// Stores the [`Terminal`] and represents the terminal environment as a whole. 
 #[derive(Debug)]
 enum Environment {
+    /// RAII wrapper over [`Terminal`] to initialize/reset the terminal environment. 
     Managed(Wrapper), 
+    /// Just stores the [`Terminal`]. 
     Unmanaged(Terminal), 
 }
 

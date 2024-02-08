@@ -1,21 +1,25 @@
-use std::{io, rc::Rc, cell::RefCell};
+use std::{
+    cell::RefCell, 
+    io, 
+    ops::{Deref, DerefMut}, 
+    rc::Rc
+};
 use crate::State;
+use self::managed::Wrapper;
 
 pub type Backend = ratatui::backend::CrosstermBackend<io::Stdout>;
 pub type Terminal = ratatui::Terminal<Backend>;
 
-#[cfg(feature = "managed_env")]
-type Environment = managed::Environment;
-
-#[cfg(not(feature = "managed_env"))]
-type Environment = Terminal;
+#[derive(Debug)]
+enum Environment {
+    Managed(Wrapper), 
+    Unmanaged(Terminal), 
+}
 
 /// Manages the terminal environment. 
 /// 
 /// Serves as a wrapper around [Ratatui's terminal](ratatui::Terminal) with added RAII to automatically
-/// initialize and reset the terminal environment. This automatic management can be disabled by disabling the
-/// `managed_env` feature, in which case the application code has to create the terminal instance manually.
-/// See the [Ratatui documentation](ratatui) for how to do this. 
+/// initialize and reset the terminal environment. 
 /// 
 /// The initialization of the terminal environment consists of: 
 /// - Installing a panic handler to make sure the terminal environment is reset before the program exits.
@@ -24,7 +28,13 @@ type Environment = Terminal;
 /// - Entering an alternate terminal buffer. 
 /// 
 /// 
-/// # Application-defined Global
+/// # Basic usage
+/// 
+/// Construct the context using [`Context::new`] and give a mutable reference to it when running states with
+/// [`State::run`]. 
+/// 
+/// 
+/// # Application-defined global
 /// 
 /// In addition to managing the terminal environment, the context also provides the utility of a global 
 /// value, which can be whatever makes sense in the application. Suitable examples include configuration 
@@ -38,7 +48,7 @@ type Environment = Terminal;
 /// [`Global`](crate::State::Global) type of all states ran with the context equal to the type of the global. 
 /// 
 /// 
-/// # Chaining With New Globals
+/// # Chaining with new globals
 /// 
 /// Though globals should generally persist across an entire application, there is support for creating a
 /// "new" context with a new global value, while reusing the same internal [`Terminal`] handle. This is
@@ -51,25 +61,36 @@ type Environment = Terminal;
 /// be avoided. 
 /// 
 /// 
-/// # Custom Panic Handler
+/// # Custom panic handler
 /// 
 /// The installed panic handler will delegate to the previous one after resetting the terminal. If a custom
 /// panic handler is used in the application, it should be installed *before* creating the context to ensure
 /// compatability. 
 /// 
 /// 
+/// # Unmanaged terminal environment
+/// 
+/// The automatic initialization and resetting of the terminal environment can be opted out from by using
+/// [`Context::new_unmanaged`] or [`Context::with_global_unmanaged`] to construct the context. Note that in
+/// these cases, the [`Terminal`] instance must be constructed manually by application code. See
+/// [Ratatui's documentation](ratatui) on how to do this. 
+/// 
+/// 
 /// # Examples
 /// 
-/// Creating a context without global data: 
-/// ```
-/// # use tundra::Context;
-/// let ctx = Context::new()?;
-/// # Ok::<(), std::io::Error>(())
+/// Creating a context without global data and using it to run a [`State`]: 
+/// ```no_run
+/// # use tundra::prelude::*;
+/// let mut ctx = Context::new()?;
+/// let some_state: // impl State<Global = ()>
+/// # () = ();
+/// some_state.run(&mut ctx)
+/// # ; Ok::<(), std::io::Error>(())
 /// ```
 /// 
 /// Creating a context with global user data: 
-/// ```
-/// # use tundra::Context;
+/// ```no_run
+/// # use tundra::prelude::*;
 /// struct User {
 ///     name: String, 
 ///     id: u32, 
@@ -79,25 +100,64 @@ type Environment = Terminal;
 ///     name: "Don Hertzfeldt".into(), 
 ///     id: 2012, 
 /// };
-/// let ctx = Context::with_global(user)?;
+/// let mut ctx = Context::with_global(user)?;
 /// 
-/// // the global can now be retrieved as: 
+/// // the global can then be retrieved as: 
 /// let user: &User = &ctx.global;
-/// # Ok::<(), std::io::Error>(())
+/// 
+/// // and the context can be used to run states that have State::Global = User
+/// # struct SomeState;
+/// # impl SomeState{ fn run<T>(self, _: T) {} }
+/// let some_state: // impl State<Global = User>
+/// # SomeState = SomeState;
+/// some_state.run(&mut ctx)
+/// # ; Ok::<(), std::io::Error>(())
 /// ```
 /// 
 /// "Removing" the global from an existing context: 
-/// ```
+/// ```no_run
 /// # use std::path::PathBuf;
-/// # use tundra::Context;
+/// # use tundra::prelude::*;
 /// let cache_dir = "~/.cache/svalbard/".into();
 /// 
-/// let old: Context<PathBuf> = Context::with_global(cache_dir)?;
-/// let new: Context<()> = old.chain_without_global();
+/// let mut old: Context<PathBuf> = Context::with_global(cache_dir)?;
+/// let new: Context = old.chain_without_global();
 /// 
 /// // old context still available!
-/// # let do_something = |_| ();
-/// do_something(old);
+/// # struct SomeState;
+/// # impl SomeState{ fn run<T>(self, _: T) {} }
+/// let some_state: // impl State<Global = PathBuf>
+/// # SomeState = SomeState;
+/// some_state.run(&mut old)
+/// # ; Ok::<(), std::io::Error>(())
+/// ```
+/// 
+/// Constructing a context without automatic management of the terminal environment: 
+/// ```no_run
+/// use std::io;
+/// use crossterm::{
+///     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen}, 
+///     cursor::{Hide, Show}, 
+/// };
+/// use ratatui::prelude::*;
+/// use tundra::{Terminal, Backend};
+/// # use tundra::prelude::*;
+/// 
+/// // construct and initialize terminal
+/// let backend = Backend::new(io::stdout());
+/// let terminal = Terminal::new(backend)?;
+/// terminal::enable_raw_mode()?;
+/// crossterm::execute!(io::stdout(), Hide, EnterAlternateScreen)?;
+/// 
+/// // construct context and run some state with it
+/// let mut ctx = Context::new_unmanaged(terminal);
+/// let some_state: // impl State<Global = ()>
+/// # () = ();
+/// some_state.run(&mut ctx);
+/// 
+/// // reset terminal
+/// terminal::disable_raw_mode();
+/// crossterm::execute!(io::stdout(), Show, LeaveAlternateScreen);
 /// # Ok::<(), std::io::Error>(())
 /// ```
 #[derive(Clone, Debug)]
@@ -111,20 +171,18 @@ pub struct Context<G = ()> {
 }
 
 impl<G> Context<G> {
-    /// Creates a new context with given global value. 
-    /// 
-    /// If no global is needed, prefer [`Context::new`]. 
-    #[cfg(feature = "managed_env")]
+    /// Creates a new context with given global value. If no global is needed, prefer [`Context::new`]. 
     pub fn with_global(global: G) -> io::Result<Self> {
-        Environment::new().map(|env| Self::with_global_impl(global, env))
+        Wrapper::new()
+            .map(Environment::Managed)
+            .map(|env| Self::with_global_impl(global, env))
     }
 
-    /// Creates a new context with given global value. 
-    /// 
-    /// If no global is needed, prefer [`Context::new`]. 
-    #[cfg(not(feature = "managed_env"))]
-    pub fn with_global(global: G, terminal: Terminal) -> Self {
-        Self::with_global_impl(global, terminal)
+    /// Creates a new context with given global value without a managed terminal environment. See the
+    /// [type-level](Context#unmanaged-terminal-environment) documentation for more information. If no global
+    /// is needed, prefer [`Context::new`]. 
+    pub fn with_global_unmanaged(global: G, terminal: Terminal) -> Self {
+        Self::with_global_impl(global, Environment::Unmanaged(terminal))
     }
 
     fn with_global_impl(global: G, environment: Environment) -> Self {
@@ -150,13 +208,10 @@ impl<G> Context<G> {
     /// ```
     pub fn apply<T>(&self, f: impl FnOnce(&Terminal) -> T) -> T {
         let env = self.environment.borrow();
-
-        #[cfg(feature = "managed_env")]
-        let term = &env.0;
-
-        #[cfg(not(feature = "managed_env"))]
-        let term = &env;
-
+        let term = match env.deref() {
+            Environment::Unmanaged(term) => term, 
+            Environment::Managed(wrapper) => &wrapper.0, 
+        };
         f(term)
     }
 
@@ -176,17 +231,14 @@ impl<G> Context<G> {
     /// ```
     pub fn apply_mut<T>(&mut self, f: impl FnOnce(&mut Terminal) -> T) -> T {
         let mut env = self.environment.borrow_mut();
-
-        #[cfg(feature = "managed_env")]
-        let term = &mut env.0;
-
-        #[cfg(not(feature = "managed_env"))]
-        let term = &mut env;
-
+        let term = match env.deref_mut() {
+            Environment::Unmanaged(term) => term, 
+            Environment::Managed(wrapper) => &mut wrapper.0, 
+        };
         f(term)
     }
 
-    /// Draws a [state](crate::State) using the internal [`Terminal`] handle. 
+    /// Draws a [`State`] using the internal [`Terminal`] handle. 
     pub fn draw_state(&mut self, state: &impl State) -> io::Result<()> {
         self.apply_mut(|terminal| terminal
             .draw(|frame| state.draw(frame))
@@ -195,9 +247,7 @@ impl<G> Context<G> {
     }
 
     /// Creates a new context with a new global from an existing context, reusing the internal [`Terminal`]
-    /// handle. 
-    /// 
-    /// This can be used "replace" the global value. See the
+    /// handle. This can be used "replace" the global value. See the
     /// [context documentation](Context#chaining-with-new-globals) for more information. 
     pub fn chain_with_global<F>(&self, global: F) -> Context<F> {
         Context {
@@ -207,9 +257,7 @@ impl<G> Context<G> {
     }
 
     /// Creates a new context without a global from an existing context, reusing the internal [`Terminal`]
-    /// handle. 
-    /// 
-    /// This can be used "remove" the global value. See the
+    /// handle. This can be used "remove" the global value. See the
     /// [context documentation](Context#chaining-with-new-globals) for more information. 
     pub fn chain_without_global(&self) -> Context {
         self.chain_with_global(())
@@ -217,24 +265,19 @@ impl<G> Context<G> {
 }
 
 impl Context<()> {
-    /// Creates a new context without a global value. 
-    /// 
-    /// If a global is needed, prefer [`Context::with_global`]. 
-    #[cfg(feature = "managed_env")]
+    /// Creates a new context without a global value. If a global is needed, prefer [`Context::with_global`]. 
     pub fn new() -> io::Result<Context> {
         Context::with_global(())
     }
 
-    /// Creates a new context without a global value. 
-    /// 
-    /// If a global is needed, prefer [`Context::with_global`]. 
-    #[cfg(not(feature = "managed_env"))]
-    pub fn new(terminal: Terminal) -> Context {
-        Context::with_global((), terminal)
+    /// Creates a new context without a global value and without a managed terminal environment. See the
+    /// [type-level](Context#unmanaged-terminal-environment) documentation for more information. If a global
+    /// is needed, prefer [`Context::with_global`]. 
+    pub fn new_unmanaged(terminal: Terminal) -> Context {
+        Context::with_global_unmanaged((), terminal)
     }
 }
 
-#[cfg(feature = "managed_env")]
 mod managed {
     use std::{
         io, 
@@ -243,21 +286,21 @@ mod managed {
     };
     use crossterm::{
         terminal::{self, EnterAlternateScreen, LeaveAlternateScreen}, 
-        cursor::{Hide, Show}
+        cursor::{Hide, Show}, 
     };
     use super::{Terminal, Backend};
 
     /// RAII wrapper over [`Terminal`] to initialize/reset the terminal environment. 
     #[derive(Debug)]
-    pub struct Environment(pub Terminal);
+    pub struct Wrapper(pub Terminal);
 
-    impl Environment {
-        pub fn new() -> io::Result<Environment> {
-            init().map(Environment)
+    impl Wrapper {
+        pub fn new() -> io::Result<Wrapper> {
+            init().map(Wrapper)
         }
     }
 
-    impl Drop for Environment {
+    impl Drop for Wrapper {
         fn drop(&mut self) {
             reset()
         }
@@ -275,7 +318,7 @@ mod managed {
         static PANIC_HOOKED: AtomicBool = AtomicBool::new(false);
 
         let backend = Backend::new(io::stdout());
-        let mut term = Terminal::new(backend)?;
+        let term = Terminal::new(backend)?;
     
         if !PANIC_HOOKED.swap(true, Ordering::Relaxed) {
             let prev_hook = panic::take_hook();
@@ -285,7 +328,7 @@ mod managed {
             }));
         }
         terminal::enable_raw_mode()?;
-        crossterm::execute!(term.backend_mut(), Hide, EnterAlternateScreen)?;
+        crossterm::execute!(io::stdout(), Hide, EnterAlternateScreen)?;
         Ok(term)
     }
     

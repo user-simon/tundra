@@ -19,9 +19,7 @@ use super::*;
 /// - `true` if the user pressed `y`. 
 /// - `false` if the user pressed `n` or `escape`. 
 pub fn confirm<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) -> bool {
-    Confirm{ msg: msg.as_ref() }
-        .run_over(over, ctx)
-        .is_some()
+    Confirm{ msg: msg.as_ref() }.run_over(over, ctx)
 }
 
 /// Displays a blue dialog asking the user to select one action among a set. 
@@ -31,14 +29,13 @@ pub fn confirm<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>)
 /// 
 /// - The selected index if the user pressed `enter`. 
 /// - `None` if the user pressed `escape`. 
-pub fn select<'a, T, U, G>(actions: T, over: &impl State, ctx: &mut Context<G>) -> Option<usize>
+pub fn select<'a, T, U, G>(actions: T, over: &impl State, ctx: &mut Context<G>) -> usize
 where
     T: AsRef<[U]>, 
     U: AsRef<str>, 
 {
     Select{ actions: actions.as_ref(), selected: 0 }
         .run_over(over, ctx)
-        .map(|x| x.selected)
 }
 
 /// Displays a blue dialog showing a message. 
@@ -65,7 +62,8 @@ pub fn fatal<G>(msg: impl AsRef<str>, ctx: &mut Context<G>) {
 
 /// Displays a dialog showing a message of specified [level](MessageLevel). 
 fn message<G>(msg: &str, level: MessageLevel, over: &impl State, ctx: &mut Context<G>) {
-    Message{ msg, level }.run_over(over, ctx);
+    Message{ msg, level }
+        .run_over(over, ctx)
 }
 
 /// Dialog to confirm an action before proceeding. 
@@ -74,6 +72,8 @@ struct Confirm<'a> {
 }
 
 impl Dialog for Confirm<'_> {
+    type Out = bool;
+
     fn format(&self) -> DrawInfo {
         DrawInfo {
             title: "Confirm".into(), 
@@ -84,14 +84,14 @@ impl Dialog for Confirm<'_> {
         }
     }
 
-    fn input(&mut self, key: KeyEvent) -> Signal {
+    fn input(self, key: KeyEvent) -> Signal<Self> {
         match key.code {
             KeyCode::Char('y') |
-            KeyCode::Char('Y') => Signal::Done, 
+            KeyCode::Char('Y') => Signal::Return(true), 
             KeyCode::Esc       |
             KeyCode::Char('n') |
-            KeyCode::Char('N') => Signal::Cancelled, 
-            _ => Signal::Running, 
+            KeyCode::Char('N') => Signal::Return(false), 
+            _ => Signal::Continue(self), 
         }
     }
 }
@@ -103,6 +103,8 @@ struct Select<'a, T> {
 }
 
 impl<'a, T: AsRef<str>> Dialog for Select<'a, T> {
+    type Out = usize;
+
     fn format(&self) -> DrawInfo {
         let format_action = |(i, action)| {
             let prefix = match i == self.selected {
@@ -127,20 +129,18 @@ impl<'a, T: AsRef<str>> Dialog for Select<'a, T> {
         }
     }
 
-    fn input(&mut self, key: KeyEvent) -> Signal {
+    fn input(mut self, key: KeyEvent) -> Signal<Self> {
         match key.code {
             KeyCode::Up => {
                 self.selected = self.selected.saturating_sub(1);
-                Signal::Running
             } 
             KeyCode::Down => {
                 self.selected = usize::min(self.selected + 1, self.actions.len() - 1);
-                Signal::Running
-            } 
-            KeyCode::Esc => Signal::Cancelled, 
-            KeyCode::Enter => Signal::Done, 
-            _ => Signal::Running, 
-        }
+            }
+            KeyCode::Enter => return Signal::Return(self.selected), 
+            _ => (), 
+        };
+        Signal::Continue(self)
     }
 }
 
@@ -159,6 +159,8 @@ struct Message<'a> {
 }
 
 impl Dialog for Message<'_> {
+    type Out = ();
+
     fn format(&self) -> DrawInfo {
         let (title, color) = match self.level {
             MessageLevel::Info    => ("Info",        Color::Cyan), 
@@ -175,7 +177,7 @@ impl Dialog for Message<'_> {
         }
     }
 
-    fn input(&mut self, _key: KeyEvent) -> Signal {
-        Signal::Done
+    fn input(self, _key: KeyEvent) -> Signal<Self> {
+        Signal::Return(())
     }
 }

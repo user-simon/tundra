@@ -1,18 +1,21 @@
 use std::convert::Infallible;
-
 use crossterm::event::{self, Event};
 use crate::prelude::*;
 
-/// Communicates when and what to return from [`State::run`] by a running state. 
+/// Dictates when and what to return from a running [`State`]. 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub enum Signal {
-    /// The state should exit and be returned. 
-    Done, 
-    /// The state should exit and not be returned. 
-    Cancelled, 
-    /// The state should continue running. 
-    Running,
+pub enum Signal<T: State> {
+    /// The state should return with given value. 
+    Return(T::Out), 
+    /// The given state should continue running. 
+    Continue(T), 
 }
+
+/// Short-hand for the type of error that can occur in a [`State`]. 
+/// 
+/// This is parameterised over the state `S` and the value type `T` (corresponding to the `Ok` type of a
+/// result). 
+pub type Error<S, T> = <<S as State>::Result<T> as ResultLike<T>>::Error;
 
 /// Defines the event loop of an application state. 
 /// 
@@ -30,8 +33,7 @@ pub enum Signal {
 /// simply delegates key press events to [`State::input`] and discards the rest. 
 /// 
 /// The interface provided by [`State::run`] is fairly low-level. In most cases, a wrapper function should be
-/// used to provide a more bespoke interface. E.g., [`dialog::confirm`], which creates a confirm dialog
-/// state, runs it, and then returns whether the user pressed `y` or `n`. 
+/// used to provide a more bespoke interface. 
 /// 
 /// 
 /// # Error Handling
@@ -46,6 +48,21 @@ pub enum Signal {
 /// implicitly `Ok`. 
 /// 
 /// 
+/// # Signals
+/// 
+/// The event handler [`State::event`] communicates when and what to return from [`State::run`] using
+/// [`Signal`]. A value of [`Signal::Continue`] indicates that the state should continue running, whereas
+/// [`Signal::Return`] indicates that the state should stop running, as well as what value should be
+/// returned. 
+/// 
+/// The return value can be whatever makes sense for the state, and the type of the value is defined by
+/// [`State::Out`]. 
+/// 
+/// To allow the return value to be moved from the state (e.g., when the return value is a field of the state
+/// struct), [`State::event`] consumes `self`. The consumed `self` is then yielded back to [`State::run`] via
+/// [`Signal::Continue`], representing the "continuation" of the state. 
+/// 
+/// 
 /// # Dummy state
 /// 
 /// A dummy (or no-nop) state is implemented through `()`. This is useful when a state is expected but not
@@ -54,20 +71,11 @@ pub enum Signal {
 /// The dummy state draws nothing and exits as soon as a key is pressed. 
 /// 
 /// 
-/// # Returns
-/// 
-/// A state "returns" when [`State::run`] returns:  
-/// 
-/// - `Some(self)` if the state exits with [`Signal::Done`]. 
-/// - `None` if the state exits with [`Signal::Cancelled`]. 
-/// 
-/// 
 /// # Examples 
 /// 
 /// A state with a counter that increases when the user presses `up`: 
 /// 
 /// ```no_run
-/// use std::io;
 /// use ratatui::widgets::Paragraph;
 /// use tundra::prelude::*;
 /// 
@@ -77,30 +85,28 @@ pub enum Signal {
 /// 
 /// impl State for Counter {
 ///     type Result<T> = T;
+///     type Out = u32;
 ///     type Global = ();
 ///     
 ///     fn draw(&self, frame: &mut Frame) {
-///         let widget = Paragraph::new(format!("{}", self.value));
+///         let widget = Paragraph::new(self.value.to_string());
 ///         frame.render_widget(widget, frame.size());
 ///     }
 ///     
-///     fn input(&mut self, key: KeyEvent, ctx: &mut Context) -> Signal {
+///     fn input(mut self, key: KeyEvent, ctx: &mut Context) -> Signal<Self> {
 ///         match key.code {
 ///             KeyCode::Up    => self.value += 1, 
-///             KeyCode::Enter => return Signal::Done, 
-///             KeyCode::Esc   => return Signal::Cancelled, 
+///             KeyCode::Tab   => self.value *= counter(ctx), 
+///             KeyCode::Enter => return Signal::Return(self.value), 
 ///             _ => (), 
 ///         }
-///         Signal::Running
+///         Signal::Continue(self)
 ///     }
 /// }
 /// 
-/// // wrapper over `State::run` to return the entered value; a common pattern
+/// // a wrapper for the state that constructs the counter and runs it -- a recommended pattern!
 /// pub fn counter(ctx: &mut Context) -> u32 {
-///     Counter{ value: 0 }
-///         .run(ctx)
-///         .map(|counter| counter.value)
-///         .unwrap_or(0)
+///     Counter{ value: 0 }.run(ctx)
 /// }
 /// ```
 pub trait State: Sized {
@@ -112,6 +118,10 @@ pub trait State: Sized {
     /// See the [trait-level](State#error-handling) documentation for more information. 
     type Result<T>: ResultLike<T>;
 
+    /// Type of the value to be returned from [`State::run`] once the state has finished running. The value
+    /// being returned is given by [`Signal::Return`] from [`State::event`]. 
+    type Out;
+
     /// Type of the application-defined global inside [`Context`]. This should be set to the same type as the
     /// one used when initializing the [`Context`]. If no global is used, this may be set to `()`. 
     type Global;
@@ -121,33 +131,33 @@ pub trait State: Sized {
     /// See [Ratatui's documentation](ratatui) for how to construct and render widgets. 
     fn draw(&self, frame: &mut Frame);
     
-    /// Update the state with a key press input. 
-    /// 
-    /// This is called by the default implementation of [`State::event`] when a key input event is read. 
+    /// Update the state with a key press input. This is called by the default implementation of
+    /// [`State::event`] when a key input event is read. 
     /// 
     /// 
     /// # Default
     /// 
-    /// Always returns [`Signal::Running`]. 
+    /// Always returns `Signal::Continue(self)`. The default implementation is provided for states that
+    /// instead implement [`State::event`]. 
     #[allow(unused_variables)]
-    fn input(&mut self, key: KeyEvent, ctx: &mut Context<Self::Global>) -> Self::Result<Signal> {
-        ResultLike::from_result(Ok(Signal::Running))
+    fn input(self, key: KeyEvent, ctx: &mut Context<Self::Global>) -> Self::Result<Signal<Self>> {
+        ResultLike::from_result(Ok(Signal::Continue(self)))
     }
 
-    /// Update the state with an event. 
-    /// 
-    /// This is called by the default implementation of [`State::run`] when an event is read. 
+    /// Update the state with an event. This is called by the default implementation of [`State::run`] when
+    /// an event is read. 
     /// 
     /// 
     /// # Default
     /// 
-    /// Simply delegates to [`State::input`], representing the most common use case. All other events are
-    /// discarded. 
-    fn event(&mut self, event: Event, ctx: &mut Context<Self::Global>) -> Self::Result<Signal> {
+    /// Simply delegates key press events to [`State::input`], representing the most common use case. All
+    /// other events are discarded. States that only care about key press events should implement
+    /// [`State::input`] instead. 
+    fn event(self, event: Event, ctx: &mut Context<Self::Global>) -> Self::Result<Signal<Self>> {
         if let Event::Key(key_event) = event {
             self.input(key_event, ctx)
         } else {
-            ResultLike::from_result(Ok(Signal::Running))
+            ResultLike::from_result(Ok(Signal::Continue(self)))
         }
     }
 
@@ -156,16 +166,15 @@ pub trait State: Sized {
     /// 
     /// # Default
     /// 
-    /// Calls [`State::draw`] and [`State::event`] until the latter returns [`Signal::Done`] or
-    /// [`Signal::Cancelled`]. 
+    /// Calls [`State::draw`] and [`State::event`] until the latter returns [`Signal::Return`]. 
     /// 
     /// 
     /// # Panics
     /// 
     /// When [`ratatui::Terminal::draw`] or [`crossterm::event::read`](event::read()) fails. 
-    fn run(mut self, ctx: &mut Context<Self::Global>) -> Self::Result<Option<Self>>
+    fn run(mut self, ctx: &mut Context<Self::Global>) -> Self::Result<Self::Out>
     where
-        StateError<Self, Option<Self>>: From<StateError<Self, Signal>>
+        Error<Self, Self::Out>: From<Error<Self, Signal<Self>>>
     {
         let result = loop {
             // we're intentionally panicking on `io::Error`s here to simplify application code (we would
@@ -181,20 +190,13 @@ pub trait State: Sized {
             };
             
             match signal {
-                Signal::Done      => break Ok(Some(self)), 
-                Signal::Cancelled => break Ok(None), 
-                Signal::Running   => (), 
+                Signal::Return(out) => break Ok(out), 
+                Signal::Continue(new_self) => self = new_self, 
             }
         };
         ResultLike::from_result(result)
     }
 }
-
-/// Short-hand for the type of error that can occur in a [`State`]. 
-/// 
-/// This is parameterised over the state `S` and the value type `T` (corresponding to the `Ok` type of a
-/// result). 
-pub type StateError<S, T> = <<S as State>::Result<T> as ResultLike<T>>::Error;
 
 /// Implements a dummy (or no-op) [`State`] through `()`. It draws nothing and exits as soon as a key is
 /// pressed. 
@@ -203,14 +205,15 @@ pub type StateError<S, T> = <<S as State>::Result<T> as ResultLike<T>>::Error;
 /// background. 
 impl State for () {
     type Result<T> = T;
+    type Out = ();
     type Global = ();
 
     fn draw(&self, _frame: &mut Frame) {
         ()
     }
 
-    fn input(&mut self, _key: KeyEvent, _ctx: &mut Context) -> Signal {
-        Signal::Done
+    fn input(self, _key: KeyEvent, _ctx: &mut Context) -> Signal<Self> {
+        Signal::Return(())
     }
 }
 

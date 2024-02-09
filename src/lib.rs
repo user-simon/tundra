@@ -65,21 +65,21 @@
 //! 
 //! impl State for Counter {
 //!     type Result<T> = T;
+//!     type Out = u32;
 //!     type Global = ();
-//! 
+//!     
 //!     fn draw(&self, frame: &mut Frame) {
-//!         let widget = Paragraph::new(format!("{}", self.value));
+//!         let widget = Paragraph::new(self.value.to_string());
 //!         frame.render_widget(widget, frame.size());
 //!     }
-//! 
-//!     fn input(&mut self, key: KeyEvent, _ctx: &mut Context) -> Signal {
+//!     
+//!     fn input(mut self, key: KeyEvent, ctx: &mut Context) -> Signal<Self> {
 //!         match key.code {
 //!             KeyCode::Up    => self.value += 1, 
-//!             KeyCode::Enter => return Signal::Done, 
-//!             KeyCode::Esc   => return Signal::Cancelled, 
+//!             KeyCode::Enter => return Signal::Return(self.value), 
 //!             _ => (), 
 //!         }
-//!         Signal::Running
+//!         Signal::Continue(self)
 //!     }
 //! }
 //! ```
@@ -87,67 +87,59 @@
 //! Some notes on the implementation: 
 //! - [`Result`](State::Result) can be used to specify what can go wrong when running the state --- analogous
 //! to an error type but [more flexible](State#error-handling). 
+//! - [`Out`](State::Out) is the type that is returned from the state once it's done running. 
 //! - [`Global`](State::Global) can be used to store a
 //! [global value inside the context](Context#application-defined-global). 
 //! - [`draw`](State::draw) is used to draw the user interface using [Ratatui](ratatui). 
 //! - [`input`](State::input) is used to handle key press events. The [`Signal`] return value indicates to
 //! the event loop when and what to return. 
 //! 
-//! Our counter can now be ran using [`State::run`]. Let's also extract the entered value from the counter
-//! after it's done running. 
+//! Our counter can now be ran using [`State::run`]. 
 //! 
 //! ```no_run
 //! # use tundra::prelude::*;
 //! # struct Counter{ value: u32 };
 //! # impl Counter{
-//! #   fn run(self, _: &mut Context) -> Option<Self> { Some(self) }
+//! #   fn run(self, _: &mut Context) -> u32 { 0 }
 //! # }
 //! # let mut ctx = &mut Context::new().unwrap();
-//! // returns when the user presses enter or escape (per our State::input)
-//! let counter = Counter{ value: 0 }.run(ctx);
-//! 
-//! // the returned `counter` is `Some(Counter)` if enter was pressed, and `None` otherwise
-//! let value = counter
-//!     .map(|c| c.value)
-//!     .unwrap_or(0);
+//! // returns the value when the user presses enter (per our State::input)
+//! let value: u32 = Counter{ value: 0 }.run(ctx);
 //! ```
 //! 
-//! This is a fair amount of boiler-plate to write each time the `Counter` state is ran, so let's create a 
-//! wrapper function that does this for us --- a common pattern! 
+//! There is not much boiler-plate in running this simple example, but for more complex states, a wrapper
+//! function that constructs and runs the state should be used. 
 //! 
 //! ```no_run
 //! # use tundra::prelude::*;
 //! # struct Counter{ value: u32 };
 //! # impl Counter{
-//! #   fn run(self, _: &mut Context) -> Option<Self> { Some(self) }
+//! #   fn run(self, _: &mut Context) -> u32 { 0 }
 //! # }
 //! pub fn counter(ctx: &mut Context) -> u32 {
-//!     Counter{ value: 0 }
-//!         .run(ctx)
-//!         .map(|counter| counter.value)
-//!         .unwrap_or(0)
+//!     Counter{ value: 0 }.run(ctx)
 //! }
 //! ```
 //! 
 //! This interface can now be used from other states to "transition" to the `Counter` state! For the sake of
 //! argument, let's create and run a new counter from within our existing counter whenever the user presses
-//! `tab`. The value entered in the new counter (the "transitioned-to" state) will be added onto the current
-//! counter. 
+//! tab. The current value will be multiplied with the value entered in the new counter (the
+//! "transitioned-to" state). 
 //! 
 //! ```no_run
 //! # use tundra::prelude::*;
 //! # fn counter(_: &mut Context) -> u32 { 0 }
 //! # struct Counter{ value: u32 };
+//! # enum Signal<T> { Continue(T), Return(u32) };
 //! # impl Counter {
-//! fn input(&mut self, key: KeyEvent, ctx: &mut Context) -> Signal {
+//! fn input(mut self, key: KeyEvent, ctx: &mut Context) -> Signal<Self> {
 //!     match key.code {
 //!         KeyCode::Up    => self.value += 1, 
-//!         KeyCode::Tab   => self.value += counter(ctx), 
-//!         KeyCode::Enter => return Signal::Done, 
-//!         KeyCode::Esc   => return Signal::Cancelled, 
+//!         KeyCode::Tab   => self.value *= counter(ctx), 
+//!         KeyCode::Enter => return Signal::Return(self.value), 
 //!         _ => (), 
 //!     }
-//!     Signal::Running
+//!     Signal::Continue(self)
 //! }
 //! # }
 //! ```

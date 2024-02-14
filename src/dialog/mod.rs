@@ -46,7 +46,7 @@ pub use form::form;
 /// 
 /// This is defined separately from [`state::Signal`](crate::state::Signal) (the one defined in the prelude)
 /// since [`Dialog`] defines its own [`Out`](Dialog::Out) type. 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Signal<T: Dialog> {
     /// The dialog should return with given value. 
     Return(T::Out), 

@@ -2,6 +2,11 @@
 name = "tundra"
 version = "0.1.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "A framework for building interactive applications for the terminal using Ratatui."
+repository = "https://github.com/user-simon/tundra"
+keywords = ["terminal", "tui", "ratatui"]
+categories = ["command-line-interface"]
 
 [dependencies]
 crossterm = "0.27.0"

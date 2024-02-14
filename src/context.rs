@@ -2,7 +2,7 @@ use std::{
     cell::RefCell, 
     io, 
     ops::{Deref, DerefMut}, 
-    rc::Rc
+    rc::Rc, 
 };
 use crate::State;
 use self::managed::Wrapper;
@@ -22,10 +22,10 @@ enum Environment {
 /// Manages the terminal environment. 
 /// 
 /// Serves as a wrapper around [Ratatui's terminal](ratatui::Terminal) with added RAII to automatically
-/// initialize and reset the terminal environment. 
-/// 
-/// The initialization of the terminal environment consists of: 
-/// - Installing a panic handler to make sure the terminal environment is reset before the program exits.
+/// initialise and reset the terminal environment. The initialisation of the terminal environment consists
+/// of: 
+/// - Installing a panic handler to make sure the terminal environment is reset before the program exits and
+/// a panic message is printed. 
 /// - Enabling raw mode. 
 /// - Hiding the cursor. 
 /// - Entering an alternate terminal buffer. 
@@ -73,7 +73,7 @@ enum Environment {
 /// 
 /// # Unmanaged terminal environment
 /// 
-/// The automatic initialization and resetting of the terminal environment can be opted out from by using
+/// The automatic initialisation and resetting of the terminal environment can be opted out from by using
 /// [`Context::new_unmanaged`] or [`Context::with_global_unmanaged`] to construct the context. Note that in
 /// these cases, the [`Terminal`] instance must be constructed manually by application code. See
 /// [Ratatui's documentation](ratatui) on how to do this. 
@@ -85,8 +85,8 @@ enum Environment {
 /// ```no_run
 /// # use tundra::prelude::*;
 /// let mut ctx = Context::new()?;
-/// let some_state: // impl State<Global = ()>
-/// # () = ();
+/// # let some_state = ();
+/// // let some_state: impl State<Global = ()>
 /// some_state.run(&mut ctx)
 /// # ; Ok::<(), std::io::Error>(())
 /// ```
@@ -108,11 +108,11 @@ enum Environment {
 /// // the global can then be retrieved as: 
 /// let user: &User = &ctx.global;
 /// 
-/// // and the context can be used to run states that have State::Global = User
+/// // and the context can be used to run states that have `State::Global = User`. 
 /// # struct SomeState;
 /// # impl SomeState{ fn run<T>(self, _: T) {} }
-/// let some_state: // impl State<Global = User>
-/// # SomeState = SomeState;
+/// # let some_state = SomeState;
+/// // let some_state: impl State<Global = User>
 /// some_state.run(&mut ctx)
 /// # ; Ok::<(), std::io::Error>(())
 /// ```
@@ -126,16 +126,17 @@ enum Environment {
 /// let mut old: Context<PathBuf> = Context::with_global(cache_dir)?;
 /// let new: Context = old.chain_without_global();
 /// 
-/// // old context still available!
+/// // old context is still available!
 /// # struct SomeState;
 /// # impl SomeState{ fn run<T>(self, _: T) {} }
-/// let some_state: // impl State<Global = PathBuf>
-/// # SomeState = SomeState;
+/// # let some_state = SomeState;
+/// // let some_state: impl State<Global = PathBuf>
 /// some_state.run(&mut old)
 /// # ; Ok::<(), std::io::Error>(())
 /// ```
 /// 
-/// Constructing a context without automatic management of the terminal environment: 
+/// Constructing a context without automatic management of the terminal environment (this requires adding
+/// [`crossterm`] to the application's dependencies): 
 /// ```no_run
 /// use std::io;
 /// use crossterm::{
@@ -154,8 +155,8 @@ enum Environment {
 /// 
 /// // construct context and run some state with it
 /// let mut ctx = Context::new_unmanaged(terminal);
-/// let some_state: // impl State<Global = ()>
-/// # () = ();
+/// # let some_state = ();
+/// // let some_state: impl State<Global = ()>
 /// some_state.run(&mut ctx);
 /// 
 /// // reset terminal
@@ -200,7 +201,7 @@ impl<G> Context<G> {
     /// 
     /// # Examples
     /// 
-    /// ```
+    /// ```no_run
     /// use ratatui::{Terminal, layout::Rect};
     /// 
     /// # use tundra::Context;
@@ -223,7 +224,7 @@ impl<G> Context<G> {
     /// 
     /// # Examples
     /// 
-    /// ```
+    /// ```no_run
     /// use ratatui::Terminal;
     /// # use tundra::Context;
     /// 

@@ -2,6 +2,12 @@ use std::convert::Infallible;
 use crossterm::event::{self, Event};
 use crate::prelude::*;
 
+/// Short-hand for the type of error that can occur in a [`State`]. 
+/// 
+/// This is parameterised over the state `S` and the value type `T` (corresponding to the `Ok` type of a
+/// result). 
+type Error<S, T> = <<S as State>::Result<T> as ResultLike<T>>::Error;
+
 /// Dictates when and what to return from a running [`State`]. 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Signal<T: State> {
@@ -10,12 +16,6 @@ pub enum Signal<T: State> {
     /// The given state should continue running. 
     Continue(T), 
 }
-
-/// Short-hand for the type of error that can occur in a [`State`]. 
-/// 
-/// This is parameterised over the state `S` and the value type `T` (corresponding to the `Ok` type of a
-/// result). 
-pub type Error<S, T> = <<S as State>::Result<T> as ResultLike<T>>::Error;
 
 /// Defines the event loop of an application state. 
 /// 
@@ -50,10 +50,10 @@ pub type Error<S, T> = <<S as State>::Result<T> as ResultLike<T>>::Error;
 /// 
 /// # Signals
 /// 
-/// The event handler [`State::event`] communicates when and what to return from [`State::run`] using
-/// [`Signal`]. A value of [`Signal::Continue`] indicates that the state should continue running, whereas
-/// [`Signal::Return`] indicates that the state should stop running, as well as what value should be
-/// returned. 
+/// The event handler [`State::event`] (and [`State::input`] by extension) communicates when and what to
+/// return from [`State::run`] using [`Signal`]. A value of [`Signal::Continue`] indicates that the state
+/// should continue running, whereas [`Signal::Return`] indicates that the state should stop running, and
+/// contains the value that should be returned. 
 /// 
 /// The return value can be whatever makes sense for the state, and the type of the value is defined by
 /// [`State::Out`]. 
@@ -73,17 +73,17 @@ pub type Error<S, T> = <<S as State>::Result<T> as ResultLike<T>>::Error;
 /// 
 /// # Examples 
 /// 
-/// A state with a counter that increases when the user presses `up`: 
+/// A state with a tally that increases when the user presses `up`: 
 /// 
 /// ```no_run
 /// use ratatui::widgets::Paragraph;
 /// use tundra::prelude::*;
 /// 
-/// struct Counter {
+/// struct Tally {
 ///     value: u32, 
 /// }
 /// 
-/// impl State for Counter {
+/// impl State for Tally {
 ///     type Result<T> = T;
 ///     type Out = u32;
 ///     type Global = ();
@@ -96,7 +96,7 @@ pub type Error<S, T> = <<S as State>::Result<T> as ResultLike<T>>::Error;
 ///     fn input(mut self, key: KeyEvent, ctx: &mut Context) -> Signal<Self> {
 ///         match key.code {
 ///             KeyCode::Up    => self.value += 1, 
-///             KeyCode::Tab   => self.value *= counter(ctx), 
+///             KeyCode::Tab   => self.value *= tally(ctx), 
 ///             KeyCode::Enter => return Signal::Return(self.value), 
 ///             _ => (), 
 ///         }
@@ -104,9 +104,9 @@ pub type Error<S, T> = <<S as State>::Result<T> as ResultLike<T>>::Error;
 ///     }
 /// }
 /// 
-/// // a wrapper for the state that constructs the counter and runs it -- a recommended pattern!
-/// pub fn counter(ctx: &mut Context) -> u32 {
-///     Counter{ value: 0 }.run(ctx)
+/// // a wrapper for the state that constructs the tally and runs it -- a recommended pattern!
+/// pub fn tally(ctx: &mut Context) -> u32 {
+///     Tally{ value: 0 }.run(ctx)
 /// }
 /// ```
 pub trait State: Sized {
@@ -126,9 +126,8 @@ pub trait State: Sized {
     /// one used when initializing the [`Context`]. If no global is used, this may be set to `()`. 
     type Global;
 
-    /// Draw the state to a [`Frame`] using [Ratatui](ratatui). 
-    /// 
-    /// See [Ratatui's documentation](ratatui) for how to construct and render widgets. 
+    /// Draw the state to a [`Frame`]. See [Ratatui's documentation](ratatui) for how to construct and render
+    /// widgets. 
     fn draw(&self, frame: &mut Frame);
     
     /// Update the state with a key press input. This is called by the default implementation of
@@ -138,7 +137,7 @@ pub trait State: Sized {
     /// # Default
     /// 
     /// Always returns `Signal::Continue(self)`. The default implementation is provided for states that
-    /// instead implement [`State::event`]. 
+    /// instead choose to implement [`State::event`]. 
     #[allow(unused_variables)]
     fn input(self, key: KeyEvent, ctx: &mut Context<Self::Global>) -> Self::Result<Signal<Self>> {
         ResultLike::from_result(Ok(Signal::Continue(self)))
@@ -177,14 +176,16 @@ pub trait State: Sized {
         Error<Self, Self::Out>: From<Error<Self, Signal<Self>>>
     {
         let result = loop {
-            // we're intentionally panicking on `io::Error`s here to simplify application code (we would
-            // otherwise have to force the application-defined error to implement `From<io::Error>`). 
-            // applications that wish to handle `io::Error` explicitly can override this function
+            // we're intentionally panicking on `io::Error` here to simplify application code (we would
+            // otherwise have to force the application-defined error to implement `From<io::Error>`). these
+            // errors should be extremely rare and only occur in extraneous circumstances. applications that
+            // wish to handle `io::Error` explicitly can override `State::run` to do so
             ctx.draw_state(&self).unwrap();
             let event = event::read().unwrap();
 
             // generalized version of `let signal = self.event(...)?`
-            let signal = match ResultLike::into_result(self.event(event, ctx)) {
+            let result = self.event(event, ctx);
+            let signal = match ResultLike::into_result(result) {
                 Ok(signal) => signal, 
                 Err(err) => break Err(err.into()), 
             };
@@ -217,9 +218,9 @@ impl State for () {
     }
 }
 
-/// Generalization over data-carrying [`Result`]-like types. 
+/// Generalisation over data-carrying [`Result`]-like types. 
 /// 
-/// There are three significant implementations of this trait: 
+/// There are three significant implementors of this trait: 
 /// - `Result<T, E>` itself, which has error type `E`. 
 /// - `Option<T>`, which has error type `()`. 
 /// - `T`, which has error type [`Infallible`] (or `!` once stabilised). 
@@ -232,11 +233,11 @@ impl State for () {
 /// # Limitations
 /// 
 /// There are limitations to this approach. Namely, it is very difficult to assert that [`State::Result`] has
-/// the same error type regardless of its value type `T` (as is true for all three implementations listed
-/// above). This means that to propogate an error from `State::Result<T>` to `State::Result<U>`, an explicit 
-/// bound to assert that the conversion between the two (ostensibly distinct) error types exists must be
-/// added. This is cumbersome for generic code (like the default implementation of [`State::run`]), but has
-/// no bearing on the concrete implementations of the states themselves. 
+/// the same error type regardless of its value type `T` (as is true for all three implementors listed above)
+/// This means that to propogate an error from `State::Result<T>` to `State::Result<U>`, an explicit bound to
+/// assert that the conversion between the two (ostensibly distinct) error types exists must be added. This
+/// is cumbersome for generic code (like the default implementation of [`State::run`]), but has no bearing on
+/// the concrete implementations of the states themselves. 
 pub trait ResultLike<T> {
     type Error;
 

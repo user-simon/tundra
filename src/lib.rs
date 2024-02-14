@@ -2,8 +2,8 @@
 //! [Ratatui](ratatui). 
 //! 
 //! [Ratatui](ratatui) is a comprehensive library for creating singular user interfaces in the terminal, but
-//! lacks features for organizing larger applications --- composed of several interfaces --- and for receiving user
-//! data input. 
+//! lacks features for organizing larger applications --- composed of several interfaces --- and for
+//! receiving user data input. 
 //! 
 //! Tundra aims to extend the functionality of [Ratatui](ratatui) with utilities for: 
 //! - Defining [application states](State). 
@@ -36,7 +36,8 @@
 //! # Basic Usage
 //! 
 //! First construct a [context](Context). This represents the underlying [terminal](ratatui::Terminal), but 
-//! has added RAII to automatically initialize and reset the terminal environment. 
+//! has added [RAII](https://en.wikipedia.org/wiki/Resource_acquisition_is_initialization) to automatically
+//! initialize and reset the terminal environment. 
 //! 
 //! ```no_run
 //! # use tundra::Context;
@@ -47,11 +48,11 @@
 //! This [context](Context) gets passed around between application states --- allowing them to draw to the
 //! terminal. 
 //! 
-//! Next, create an application state. For this example, we'll create a state with a counter that increases
+//! Next, create an application state. For this example, we'll create a state with a tally that increases
 //! when the user presses `up`. 
 //! 
 //! ```no_run
-//! struct Counter {
+//! struct Tally {
 //!     value: u32, 
 //! }
 //! ```
@@ -61,9 +62,9 @@
 //! ```no_run
 //! use ratatui::widgets::Paragraph;
 //! # use tundra::prelude::*;
-//! # struct Counter{ value: u32 };
+//! # struct Tally{ value: u32 };
 //! 
-//! impl State for Counter {
+//! impl State for Tally {
 //!     type Result<T> = T;
 //!     type Out = u32;
 //!     type Global = ();
@@ -94,17 +95,17 @@
 //! - [`input`](State::input) is used to handle key press events. The [`Signal`] return value indicates to
 //! the event loop when and what to return. 
 //! 
-//! Our counter can now be ran using [`State::run`]. 
+//! Our tally can now be ran using [`State::run`]. 
 //! 
 //! ```no_run
 //! # use tundra::prelude::*;
-//! # struct Counter{ value: u32 };
-//! # impl Counter{
+//! # struct Tally{ value: u32 };
+//! # impl Tally{
 //! #   fn run(self, _: &mut Context) -> u32 { 0 }
 //! # }
 //! # let mut ctx = &mut Context::new().unwrap();
 //! // returns the value when the user presses enter (per our State::input)
-//! let value: u32 = Counter{ value: 0 }.run(ctx);
+//! let value: u32 = Tally{ value: 0 }.run(ctx);
 //! ```
 //! 
 //! There is not much boiler-plate in running this simple example, but for more complex states, a wrapper
@@ -112,30 +113,30 @@
 //! 
 //! ```no_run
 //! # use tundra::prelude::*;
-//! # struct Counter{ value: u32 };
-//! # impl Counter{
+//! # struct Tally{ value: u32 };
+//! # impl Tally{
 //! #   fn run(self, _: &mut Context) -> u32 { 0 }
 //! # }
-//! pub fn counter(ctx: &mut Context) -> u32 {
-//!     Counter{ value: 0 }.run(ctx)
+//! pub fn tally(ctx: &mut Context) -> u32 {
+//!     Tally{ value: 0 }.run(ctx)
 //! }
 //! ```
 //! 
-//! This interface can now be used from other states to "transition" to the `Counter` state! For the sake of
-//! argument, let's create and run a new counter from within our existing counter whenever the user presses
-//! tab. The current value will be multiplied with the value entered in the new counter (the
-//! "transitioned-to" state). 
+//! This interface can now be used from other states to "transition" to the `Tally` state! For the sake of
+//! argument, let's create and run a new tally from within our existing tally whenever the user presses tab. 
+//! The current value will be multiplied with the value entered in the new tally (the "transitioned-to"
+//! state). 
 //! 
 //! ```no_run
 //! # use tundra::prelude::*;
-//! # fn counter(_: &mut Context) -> u32 { 0 }
-//! # struct Counter{ value: u32 };
+//! # fn tally(_: &mut Context) -> u32 { 0 }
+//! # struct Tally{ value: u32 };
 //! # enum Signal<T> { Continue(T), Return(u32) };
-//! # impl Counter {
+//! # impl Tally {
 //! fn input(mut self, key: KeyEvent, ctx: &mut Context) -> Signal<Self> {
 //!     match key.code {
 //!         KeyCode::Up    => self.value += 1, 
-//!         KeyCode::Tab   => self.value *= counter(ctx), 
+//!         KeyCode::Tab   => self.value *= tally(ctx), 
 //!         KeyCode::Enter => return Signal::Return(self.value), 
 //!         _ => (), 
 //!     }
@@ -144,8 +145,9 @@
 //! # }
 //! ```
 //! 
-//! See the [`counter` example](https://github.com/user-simon/tundra/blob/main/examples/counter.rs) for the
-//! complete code. 
+//! That's all you need to get started! See the
+//! [`tally` example](https://github.com/user-simon/tundra/blob/main/examples/tally.rs) for the complete
+//! code. 
 //! 
 //! 
 //! # Modal Dialogs
@@ -210,7 +212,7 @@
 //! 
 //! Some notes about the example: 
 //! - As with other dialogs, a context and background state must be provided. For forms, this is done with
-//! the `[context]` and `[background]` "meta-fields". 
+//! the `[context]` and `[background]` "meta-fields."
 //! - The values (and the fields) are stored as members of unspellable structs created inside the macro --- 
 //! no runtime lookup is required! Values are accessed using the same identifers that the corresponding
 //! fields were declared with. 
@@ -241,7 +243,7 @@
 //! 
 //! # Examples
 //! 
-//! TODO
+//! See the [examples folder](https://github.com/user-simon/tundra/tree/main/examples) on GitHub. 
 
 mod context;
 pub mod dialog;

@@ -1,4 +1,4 @@
-//! Modal dialogs displayed in the middle of the screen, covering some background [state](crate::State). 
+//! Modal dialogs displayed in the middle of the screen, covering some background [`State`]. 
 //! 
 //! The following dialogs are defined in this module: 
 //! - [`dialog::confirm`] asks the user to confirm an action before proceeding. 
@@ -174,7 +174,7 @@ pub struct DrawInfo<'a> {
     /// Default: `50`. 
     pub width_percentage: u8, 
     /// Settings used to wrap the body [`Paragraph`]. Set to `None` to disable wrapping. Default: uses
-    /// wrapping with [`Wrap::trim`] set to true. 
+    /// wrapping with [`Wrap::trim`] set to false. 
     pub wrap: Option<Wrap>, 
     /// Function constructing a [`Title`] from a string. Default: turns the title uppercase and inserts a
     /// space on either side of it. 
@@ -197,7 +197,7 @@ impl<'a> Default for DrawInfo<'a> {
             hint: "".into(), 
             inner_margin: [3, 1], 
             width_percentage: 50, 
-            wrap: Some(Wrap{ trim: true }), 
+            wrap: Some(Wrap{ trim: false }), 
             create_title: |title| match title.is_empty() {
                 true => "".into(), 
                 false => format!(" {title} ").to_uppercase().into(), 

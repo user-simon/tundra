@@ -34,8 +34,7 @@ where
     T: AsRef<[U]>, 
     U: AsRef<str>, 
 {
-    Select{ actions: actions.as_ref(), selected: 0 }
-        .run_over(over, ctx)
+    Select{ actions: actions.as_ref(), selected: 0 }.run_over(over, ctx)
 }
 
 /// Displays a blue dialog showing a message. 
@@ -62,8 +61,7 @@ pub fn fatal<G>(msg: impl AsRef<str>, ctx: &mut Context<G>) {
 
 /// Displays a dialog showing a message of specified [level](MessageLevel). 
 fn message<G>(msg: &str, level: MessageLevel, over: &impl State, ctx: &mut Context<G>) {
-    Message{ msg, level }
-        .run_over(over, ctx)
+    Message{ msg, level }.run_over(over, ctx)
 }
 
 /// Dialog to confirm an action before proceeding. 
@@ -172,7 +170,7 @@ impl Dialog for Message<'_> {
             title: title.into(), 
             color, 
             body: self.msg.into(), 
-            hint: "Press any key to continue...".into(), 
+            hint: "Press any key to close...".into(), 
             ..Default::default()
         }
     }

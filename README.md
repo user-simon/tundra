@@ -21,7 +21,7 @@ low-level terminal operations.
 
 ## 📚 Documentation
 
-Read the documentation **[HERE](https://docs.rs/tundra/latest/tundra/)**. 
+Read the documentation **[HERE](https://docs.rs/tundra/)**. 
 
 
 ## 🪪 Modal Dialogs

@@ -22,12 +22,14 @@
 //! 
 //! # Getting Started
 //! 
-//! Add Tundra and Ratatui to the project dependencies: 
+//! Add Tundra and Ratatui to the project dependencies, and note that the version of Ratatui used must be
+//! [compatible](https://doc.rust-lang.org/cargo/reference/resolver.html#semver-compatibility) with the one
+//! used by Tundra: 
 //! ```text
-//! $ cargo add tundra ratatui
+//! $ cargo add tundra ratatui@0.26
 //! ```
 //! 
-//! Import the [Tundra prelude](prelude), exposing symbols required in virtually all applications: 
+//! Next, import the [Tundra prelude](prelude), exposing symbols required in virtually all applications: 
 //! ```no_run
 //! use tundra::prelude::*;
 //! ```

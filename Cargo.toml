@@ -9,6 +9,6 @@ keywords = ["terminal", "tui", "ratatui"]
 categories = ["command-line-interface"]
 
 [dependencies]
-crossterm = "0.27"
-num-traits = "0.2"
-ratatui = { version = "0.26", features = ["unstable-rendered-line-info"] }
+crossterm = "0.27.0"
+num-traits = "0.2.18"
+ratatui = { version = "0.26.0", features = ["unstable-rendered-line-info"] }

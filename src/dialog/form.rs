@@ -144,7 +144,7 @@
 /// ```
 #[macro_export]
 macro_rules! form {
-    {
+    [
         // A comma-separated list of fields
         $(
             $id:ident: $type:ty {
@@ -154,266 +154,450 @@ macro_rules! form {
                 ),+
                 $(,)?
             }
-        ),+, 
-        // User-visible title of the dialog box. Should be `impl Into<Cow<str>>`
-        [title]: $title:expr, 
-        // Current context. Should be `&mut Context<_>`
-        [context]: $ctx:expr, 
-        // State shown underneath the dialog box. Should be `&impl State`
-        [background]: $bg:expr
-        // Function to validate the entered values. Should return `Result<(), impl AsRef<str>>`
-        $(, [validate]: |$form_id:ident| $validate:expr)?
-        $(,)?
-    } => {{
-        struct __Form<'a> {
-            pub __focus: usize, 
-            pub __title: std::borrow::Cow<'a, str>, 
             $(
-                pub $id: $type, 
+                if $control:expr => $control_err:literal
             )*
-        }
+        ),+, 
+        $([$meta_id:ident]: $meta_expr:expr),*
+        $(,)?
+    ] => {{
+        use std::{
+            convert::Into as __Into, 
+            borrow::Cow as __Cow, 
+            result::Result as __Result, 
+            option::Option as __Option, 
+        };
+        use $crate::{
+            dialog::form::internal as __internal, 
+            field::Field as __Field, 
+        };
+
+        #[allow(non_camel_case_types)]
+        enum __Indices {$(
+            $id, 
+        )*}
 
         #[allow(dead_code)]
         struct __Values {$(
-            pub $id: <$type as $crate::field::Field>::Value,
+            $id: <$type as __Field>::Value,
         )*}
         
         #[allow(dead_code)]
         struct __BorrowedValues<'a> {$(
-            pub $id: &'a <$type as $crate::field::Field>::Value,
+            $id: &'a <$type as __Field>::Value,
         )*}
 
-        #[allow(unused_variables)]
-        const __FIELDS: usize = 0 $(
-            + {
-                let $id = ();
-                1
-            }
-        )*;
+        struct __Control<'a> {$(
+            $id: __internal::Control<'a, $type>, 
+        )*}
 
-        impl $crate::dialog::form::internal::Form for __Form<'_> {
-            type Values = __Values;
-            type BorrowedValues<'a> = __BorrowedValues<'a> where Self: 'a;
+        struct __Form<'a> {
+            __focus: usize, 
+            __control: __Control<'a>, 
+            __title: __Cow<'a, str>, 
+            __message: __Cow<'a, str>, 
+            $(
+                $id: $type, 
+            )*
+        }
 
-            fn title(&self) -> &str {
-                std::convert::AsRef::as_ref(&self.__title)
-            }
+        const __FIELDS: usize = [$(__Indices::$id),*].len();
 
-            fn max_focus(&self) -> usize {
-                __FIELDS - 1
-            }
-
-            fn focus(&self) -> usize {
-                self.__focus
-            }
-
-            fn set_focus(&mut self, focus: usize) {
-                self.__focus = focus;
+        impl __Form<'_> {
+            fn values(&self) -> __BorrowedValues {
+                __BorrowedValues {$(
+                    $id: __Field::value(&self.$id), 
+                )*}
             }
 
-            fn format_dispatch(&self) -> std::vec::Vec<ratatui::text::Text> {
-                use std::vec::Vec;
-                use ratatui::text::{Line, Text};
-                use $crate::{field::Field, dialog::form::internal};
+            fn into_values(self) -> __Values {
+                __Values {$(
+                    $id: __Field::into_value(self.$id), 
+                )*}
+            }
+        }
 
-                type Dispatch = for<'a> fn(&'a __Form<'a>, bool, usize) -> Text;
+        impl<'a> $crate::dialog::Dialog for __Form<'a> {
+            type Out = __Option<Self>;
+
+            fn format(&self) -> $crate::dialog::DrawInfo {
+                use std::{
+                    default::Default as _, 
+                    convert::From as _, 
+                };
+                use ratatui::text::Text;
+                use $crate::dialog::DrawInfo;
 
                 let name_lengths = [$(
-                    Field::name(&self.$id).len(), 
+                    __Field::name(&self.$id).len(), 
                 )*];
                 let max_name = name_lengths
                     .into_iter()
                     .max()
                     .unwrap_or(0);
+                let texts = [
+                    $({
+                        let focus = __Indices::$id as usize == self.__focus;
+                        let name = __Field::name(&self.$id);
+                        let body = __Field::format(&self.$id, focus);
+                        let error = self.__control.$id.is_err();
+                        __internal::format_field(name, body, focus, max_name, error)
+                    },)*
+                ];
+                let header = (self.__message.len() != 0)
+                    .then(|| [Text::from(self.__message.as_ref()), Text::from("")])
+                    .into_iter()
+                    .flatten();
+                let body = header
+                    .chain(texts)
+                    .fold(Text::default(), |mut acc, body| {
+                        acc.extend(body);
+                        acc
+                    });
 
-                const DISPATCHES: [Dispatch; __FIELDS] = [$(
-                    |form, focus, align_to| {
-                        let name = Field::name(&form.$id);
-                        let body = Field::format(&form.$id, focus);
-                        internal::format_field(name, body, focus, align_to)
-                    }, 
-                )*];
-
-                DISPATCHES.iter()
-                    .enumerate()
-                    .map(|(i, f)| f(self, i == self.__focus, max_name))
-                    .collect()
+                DrawInfo {
+                    title: __Cow::from(self.__title.as_ref()), 
+                    body, 
+                    hint: __Cow::from("Press (enter) to submit, (esc) to cancel..."), 
+                    wrap: __Option::None, 
+                    ..DrawInfo::default()
+                }
             }
+            
+            fn input(mut self, key: KeyEvent) -> $crate::Signal<Self> {
+                use $crate::{Signal, field::InputResult};
 
-            fn input_dispatch(&mut self, key: KeyEvent) -> $crate::field::InputResult {
-                use $crate::field::{Field, InputResult};
-
-                type Dispatch = fn(&mut __Form, KeyEvent) -> InputResult;
+                type Dispatch<'a> = fn(&mut __Form, KeyEvent) -> InputResult;
 
                 const JUMP_TABLE: [Dispatch; __FIELDS] = [$(
-                    |form, key| Field::input(&mut form.$id, key)
+                    |form, key| __internal::input_dispatch(&mut form.$id, &mut form.__control.$id, key)
                 ),*];
-                JUMP_TABLE[self.__focus](self, key)
-            }
-    
-            fn into_values(self) -> Self::Values {
-                use $crate::field::Field;
 
-                __Values {$(
-                    $id: Field::into_value(self.$id), 
-                )*}
-            }
-
-            fn values<'a>(&'a self) -> Self::BorrowedValues<'a> {
-                use $crate::field::Field;
-
-                __BorrowedValues {$(
-                    $id: Field::value(&self.$id), 
-                )*}
+                match key.code {
+                    KeyCode::Esc => Signal::Return(None), 
+                    KeyCode::Enter => Signal::Return(Some(self)), 
+                    _ => {
+                        let dispatch_result = JUMP_TABLE[self.__focus](&mut self, key);
+        
+                        match (dispatch_result, key.code) {
+                            (InputResult::Ignored, KeyCode::Up) => {
+                                self.__focus = self.__focus.saturating_sub(1);
+                            }
+                            (InputResult::Ignored, KeyCode::Down) => {
+                                self.__focus = usize::min(self.__focus + 1, __FIELDS - 1);
+                            }
+                            _ => (), 
+                        };
+                        Signal::Continue(self)
+                    }
+                }
             }
         }
 
-        let __validate = (
-            // if $validate is defined, first element is that callback
-            $(|$form_id: __BorrowedValues| $validate,)? 
-            // otherwise, first element is this default validator that always returns Ok
-            |_: __BorrowedValues| std::result::Result::<(), &str>::Ok(()), 
-        ).0;
-        
-        let __form = __Form {
+        fn __run<'a, T>(
+            mut form: __Form<'a>, 
+            bg: &impl $crate::State, 
+            ctx: &mut $crate::Context<T>, 
+            mut validate: impl std::ops::FnMut(__BorrowedValues) -> __Result<(), __Cow<'a, str>>, 
+        ) -> __Option<__Values> {
+            use $crate::dialog::Dialog as _;
+
+            loop {
+                // run form dialog; if the user cancels, exit immediately
+                let __Option::Some(out) = form.run_over(bg, ctx) else {
+                    break None
+                };
+                form = out;
+
+                let control_result = __internal::format_control_error(&[$(
+                    (__Field::name(&form.$id), form.__control.$id.updated_result(&form.$id)), 
+                )*]);
+                let validation_result = match control_result {
+                    __Result::Ok(()) => validate(form.values()), 
+                    __Result::Err(e) => __Result::Err(__Cow::from(e)), 
+                };
+                match validation_result {
+                    __Result::Ok(()) => break __Option::Some(form.into_values()), 
+                    __Result::Err(e) => $crate::dialog::error(e, bg, ctx), 
+                }
+            }
+        }
+
+        struct __Meta<'a, A, B, C, D, E, X>
+        where
+            A: __Into<__Cow<'a, str>>, 
+            D: __Into<__Cow<'a, str>>, 
+            E: std::ops::FnMut(__BorrowedValues) -> __Result<(), X>, 
+            X: __Into<__Cow<'a, str>>, 
+        {
+            title: A, 
+            context: &'a mut $crate::Context<B>, 
+            background: &'a C, 
+            message: D, 
+            validate: E, 
+        }
+
+        let mut meta = $crate::parse_form_meta!{
+            __Meta {
+                $($meta_id: $meta_expr,)*
+            } else {
+                message: "", 
+                validate: |_| __Result::<(), __Cow<'_, str>>::Ok(()), 
+            }
+        };
+
+        let control = __Control {
+            $($id: __internal::Control {
+                callback: &|value: &<$type as __Field>::Value| {
+                    $(
+                        if $control(value) {
+                            return __Result::Err(__Cow::from($control_err))
+                        }
+                    )*
+                    __Result::Ok(())
+                }, 
+                state: __internal::ControlState::Unknown, 
+            },)*
+        };
+        let validate = |values: __BorrowedValues| (meta.validate)(values).map_err(__Cow::from);
+
+        let form = __Form {
             __focus: 0, 
-            __title: std::convert::Into::into($title), 
-            // initialize fields with builder pattern using given arguments
+            __control: control, 
+            __title: __Cow::from(meta.title), 
+            __message: __Cow::from(meta.message), 
+            // initialise fields with builder pattern using given arguments
             $($id: {
-                let builder = <$type as $crate::field::Field>::builder()
+                let builder = <$type as __Field>::builder()
                 $(
                     .$arg_id($($arg_val)?)
                 )*;
-                builder.build()
+                $crate::field::Build::build(builder)
             },)*
         };
-        $crate::dialog::form::internal::Form::run_over(__form, $bg, $ctx, __validate)
+        __run(form, meta.background, meta.context, validate)
     }}
+}
+
+#[macro_export]
+#[doc(hidden)]
+macro_rules! parse_form_meta {
+    // Entry point. 
+    [
+        $struct:ident {
+            $($meta_id:ident: $meta_val:expr,)*
+        } else {
+            $($default_id:ident: $default_val:expr,)*
+        }
+    ] => {
+        $crate::parse_form_meta!{@impl $struct ($)
+            <$(($default_id, $default_val))*>
+            <>
+            $(($meta_id, $meta_val))*
+        }
+    };
+    // Base case: takes all meta-field name-value pairs along with the required defaults and constructs the
+    // struct using them. 
+    [@impl $struct:ident $_:tt
+        // Required defaults
+        <$(($default_id:ident, $default_val:expr))*>
+        // Name-value pairs
+        <$(($id:ident, $val:expr))*>
+    ] => {
+        $struct {
+            $(
+                $id: $val, 
+            )*
+            $(
+                $default_id: $default_val, 
+            )*
+        }
+    };
+    // Recursive case: for each provided name-value pair, filters out the corresponding default (if one
+    // exists). 
+    [@impl $struct:ident ($s:tt)
+        // Remaining defaults that haven't yet gotten filtered out
+        <$(($default_id:ident, $default_val:expr))*>
+        // Accumulated name-value pairs. "Stored" here so we can access them in the base case
+        <$(($acc_id:ident, $acc_val:expr))*>
+        // Name-value pairs yet to be processed
+        ($id:ident, $val:expr) $($tail:tt)*
+    ] => {{
+        // macro to go through all the remaining defaults, accumulate the ones that don't have a $default_id
+        // equal to $id, and then recursively call parse_form_meta! to process the rest of the name-value
+        // pairs. this has to be a nested macro to hard-code $id in its pattern (and the $s argument is
+        // needed to insert $ without having the outer macro try to expand it). note that this amount of
+        // TT-munching probably isn't ideal from a compile-time performance standpoint, but I can't think of
+        // a better way of doing it without compromising usability and error handling
+        macro_rules! __filter {
+            // base case: $id has been filtered from the accumulated defaults; proceed to the next $id
+            [<$s(($s ID:ident, $s VAL:expr))*>] => {
+                $crate::parse_form_meta!{@impl $struct ($s)
+                    <$s(($s ID, $s VAL))*>
+                    <$(($acc_id, $acc_val))* ($id, $val)>
+                    $($tail)*
+                }
+            };
+            // recursive case where the $default_id is equal to $id: ignore the default and process the rest
+            [<$s(($s ID:ident, $s VAL:expr))*> ($id, $s _:tt) $s($s TAIL:tt)*] => {
+                __filter!(<$s(($s ID, $s VAL))*> $s($s TAIL)*)
+            };
+            // recursive case otherwise: add the default to the accumulator and process the rest
+            [<$s(($s ID:ident, $s VAL:expr))*> $s HEAD:tt $s($s TAIL:tt)*] => {
+                __filter!(<$s(($s ID, $s VAL))* $s HEAD> $s($s TAIL)*)
+            };
+        }
+        __filter!(<> $(($default_id, $default_val))*)
+    }};
+}
+
+#[test]
+fn playground() {
+    use crate::prelude::*;
+    use crate::field::*;
+
+    let mut ctx = Context::new().unwrap();
+
+    form!{
+        location: Textbox{ name: "Location" }
+            if str::is_empty => "Value must be non-empty"
+            if |value| value == "asdf" => "Must not be equal to asdf", 
+        rent: Slider<u32>{ name: "Monthly rent", range: 1..=5000, step: 1 }, 
+        pets_allowed: Checkbox{ name: "Pets allowed" }, 
+
+        [background]: &(), 
+        [context]: &mut ctx, 
+        [title]: "Register Rent Unit", 
+        [validate]: |values| {
+            if values.location.len() == *values.rent as usize {
+                Err("Error")
+            } else {
+                Ok(())
+            }
+        }, 
+    };
 }
 
 pub mod internal {
     use std::iter;
     use ratatui::{
-        text::{Span, Line}, 
         style::{Style, Stylize}, 
+        text::{Line, Span}, 
     };
-    use crate::{
-        dialog::{self, *}, 
-        field::InputResult, 
-    };
+    use crate::{dialog::*, field::{Field, InputResult}};
 
-    pub trait Form: Sized {
-        type Values;
-        type BorrowedValues<'a> where Self: 'a;
+    pub enum ControlState<'a> {
+        Unknown, 
+        Ok, 
+        Err(Cow<'a, str>), 
+    }
 
-        fn title(&self) -> &str;
+    pub struct Control<'a, T: Field> {
+        pub callback: &'a dyn Fn(&T::Value) -> Result<(), Cow<'a, str>>, 
+        pub state: ControlState<'a>, 
+    }
 
-        fn max_focus(&self) -> usize;
+    impl<'a, T: Field> Control<'a, T> {
+        pub fn updated_result<'b>(&'b mut self, field: &T) -> Result<(), &'b str> {
+            if let ControlState::Unknown = self.state {
+                self.update(field);
+            }
+            match &self.state {
+                ControlState::Unknown => unreachable!(),
+                ControlState::Ok => Ok(()),
+                ControlState::Err(e) => Err(e),
+            }
+        }
 
-        fn focus(&self) -> usize;
-        fn set_focus(&mut self, focus: usize);
+        pub fn update(&mut self, field: &T) {
+            self.state = match (self.callback)(field.value()) {
+                Ok(()) => ControlState::Ok, 
+                Err(err) => ControlState::Err(err), 
+            };
+        }
 
-        fn into_values(self) -> Self::Values;
-        fn values<'a>(&'a self) -> Self::BorrowedValues<'a>;
+        pub const fn is_err(&self) -> bool {
+            match self.state {
+                ControlState::Unknown => false,
+                ControlState::Ok => false,
+                ControlState::Err(_) => true,
+            }
+        }
+    }
 
-        fn input_dispatch(&mut self, key: KeyEvent) -> InputResult;
-        fn format_dispatch(&self) -> Vec<Text>;
+    #[inline(never)]
+    pub fn input_dispatch<T: Field>(field: &mut T, control: &mut Control<T>, key: KeyEvent) -> InputResult {
+        let result = field.input(key);
+        
+        if let InputResult::Updated = result {
+            control.update(&field);
+        }
+        result
+    }
 
-        fn run_over<G, T, U, V>(mut self, bg: &T, ctx: &mut Context<G>, mut validate: U)
-            -> Option<Self::Values>
-        where
-            T: State, 
-            U: FnMut(Self::BorrowedValues<'_>) -> std::result::Result<(), V>, 
-            V: AsRef<str>, 
+    #[inline(never)]
+    pub fn format_field<'a>(name: &'a str, mut body: Text<'a>, focused: bool, align_to: usize, error: bool)
+        -> Text<'a>
+    {
+        // make sure we have at least one line to put the title in
+        if body.lines.is_empty() {
+            body.lines.push(Line::default())
+        }
+
+        // add title to first line
         {
-            loop {
-                let dialog = FormDialog(self);
-
-                // run form dialog; if the user cancels, exit immediately
-                let Some(out) = dialog.run_over(bg, ctx) else {
-                    break None
+            let delimiter = match focused {
+                true => " : ", 
+                false => " │ ", 
+            };
+            let style = {
+                let style = Style::default();
+                let style = match focused {
+                    true => style.bold(), 
+                    false => style, 
                 };
-                self = out.0;
-
-                match validate(self.values()) {
-                    Ok(_) => break Some(self.into_values()), 
-                    Err(e) => dialog::error(e, bg, ctx), 
-                }
-            }
-        }
-    }
-
-    struct FormDialog<T>(T);
-
-    impl<T: Form> Dialog for FormDialog<T> {
-        type Out = Option<Self>;
-
-        fn format(&self) -> DrawInfo {
-            let body: Vec<Line> = self.0.format_dispatch()
-                .into_iter()
-                .flat_map(|body| body.lines)
-                .collect();
-            DrawInfo {
-                title: self.0.title().into(), 
-                body: body.into(), 
-                hint: "Press (enter) to submit, (esc) to cancel...".into(), 
-                wrap: None, 
-                ..Default::default()
-            }
-        }
-
-        fn input(mut self, key: KeyEvent) -> Signal<Self> {
-            match key.code {
-                KeyCode::Esc => Signal::Return(None), 
-                KeyCode::Enter => Signal::Return(Some(self)), 
-                _ => {
-                    let dispatch_result = self.0.input_dispatch(key);
-                    let focus = self.0.focus();
-    
-                    match (dispatch_result, key.code) {
-                        (InputResult::Ignored, KeyCode::Up) => {
-                            self.0.set_focus(focus.saturating_sub(1));
-                        }
-                        (InputResult::Ignored, KeyCode::Down) => {
-                            let focus = usize::min(focus + 1, self.0.max_focus());
-                            self.0.set_focus(focus);
-                        }
-                        _ => (), 
-                    };
-                    Signal::Continue(self)
-                }
-            }
-        }
-    }
-
-    pub fn format_field<'a>(name: &str, mut body: Text<'a>, focused: bool, align_to: usize) -> Text<'a> {
-        let (delimiter, style) = match focused {
-            true => (" : ", Style::new().bold()),
-            false => (" │ ", Style::new()),
+                let style = match error {
+                    true => style.red(), 
+                    false => style, 
+                };
+                style
+            };
+            let padding: Span = iter::repeat(' ')
+                .take(align_to.saturating_sub(name.len()))
+                .collect::<String>()
+                .into();
+            let name = Span::styled(name, style);
+            let delimiter = Span::raw(delimiter);
+            let title = [padding, name, delimiter];
+            body.lines[0].spans.splice(0..0, title);
         };
 
-        let padding = align_to.saturating_sub(name.len());
-        let title: String = iter::repeat(' ')
-            .take(padding)
-            .chain(name.chars())
-            .chain(delimiter.chars())
-            .collect();
-        let title = Span::styled(title, style);
-
-        let mut lines = body.lines.iter_mut();
-
-        if let Some(first) = lines.next() {
-            first.spans.insert(0, title);
-        }
-        
-        for line in lines {
+        // indent remaining lines
+        for line in &mut body.lines[1..] {
             let indent: String = iter::repeat(' ')
                 .take(align_to)
-                .chain(delimiter.chars())
+                .chain(" │ ".chars())
                 .collect();
-            line.spans.insert(0, indent.into())
+            line.spans.insert(0, indent.into());
         }
         body
+    }
+
+    #[inline(never)]
+    pub fn format_control_error(results: &[(&str, Result<(), &str>)]) -> Result<(), String> {
+        let messages: Vec<String> = results
+            .iter()
+            .filter_map(|(name, state)| state
+                .as_ref()
+                .err()
+                .map(|e| (name, e))
+            )
+            .map(|(name, error)| format!("{name}: {error}"))
+            .collect();
+        match messages.is_empty() {
+            true => Ok(()), 
+            false => Err(messages.join("\n")), 
+        }
     }
 }
 

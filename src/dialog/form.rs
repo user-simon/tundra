@@ -354,6 +354,7 @@ macro_rules! form {
                             return __Result::Err(__Cow::from($control_err))
                         }
                     )*
+                    let _ = value;
                     __Result::Ok(())
                 }, 
                 state: __internal::ControlState::Unknown, 

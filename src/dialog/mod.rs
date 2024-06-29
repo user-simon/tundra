@@ -42,18 +42,6 @@ use crate::prelude::*;
 pub use basic::*;
 pub use form::form;
 
-/// Dialog analogue to [`state::Signal`](crate::state::Signal). 
-/// 
-/// This is defined separately from [`state::Signal`](crate::state::Signal) (the one defined in the prelude)
-/// since [`Dialog`] defines its own [`Out`](Dialog::Out) type. 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum Signal<T: Dialog> {
-    /// The dialog should return with given value. 
-    Return(T::Out), 
-    /// The given dialog should continue running. 
-    Continue(T), 
-}
-
 /// Interface for content displayed inside a dialog. 
 /// 
 /// For most applications, the [library provided dialogs](dialog) should suffice, but custom dialogs may be
@@ -128,6 +116,21 @@ pub trait Dialog: Sized {
     fn run_over<G>(self, background: &impl State, ctx: &mut Context<G>) -> Self::Out {
         Container{ content: self, background }
             .run(&mut ctx.chain_without_global())
+    }
+}
+
+impl<T: Dialog> State for T {
+    type Result<U> = U;
+    type Out = T::Out;
+    type Global = ();
+
+    fn draw(&self, frame: &mut Frame) {
+        let draw_info = self.format();
+        draw_dialog(draw_info, frame)
+    }
+
+    fn input(self, key: KeyEvent, _ctx: &mut Context) -> Signal<Self> {
+        self.input(key)
     }
 }
 
@@ -209,8 +212,6 @@ impl<'a> Default for DrawInfo<'a> {
     }
 }
 
-type StateSignal<T> = super::state::Signal<T>;
-
 /// This represents the dialog box and serves as the common [`State`] implementation for all
 /// [dialogs](Dialog). 
 /// 
@@ -235,10 +236,10 @@ impl<T: Dialog, U: State> State for Container<'_, T, U> {
         draw_dialog(draw_info, frame)
     }
 
-    fn input(self, key: KeyEvent, _ctx: &mut Context) -> StateSignal<Self> {
+    fn input(self, key: KeyEvent, _ctx: &mut Context) -> Signal<Self> {
         match self.content.input(key) {
-            Signal::Return(out) => StateSignal::Return(out),
-            Signal::Continue(content) => StateSignal::Continue(Container{ content, ..self }),
+            Signal::Return(out) => Signal::Return(out),
+            Signal::Continue(content) => Signal::Continue(Container{ content, ..self }),
         }
     }
 }

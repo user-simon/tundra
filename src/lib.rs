@@ -26,7 +26,7 @@
 //! [compatible](https://doc.rust-lang.org/cargo/reference/resolver.html#semver-compatibility) with the one
 //! used by Tundra: 
 //! ```text
-//! $ cargo add tundra ratatui@0.26
+//! $ cargo add tundra ratatui@0.27
 //! ```
 //! 
 //! Next, import the [Tundra prelude](prelude), exposing symbols required in virtually all applications: 

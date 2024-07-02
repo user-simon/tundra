@@ -290,7 +290,7 @@ fn draw_dialog<'a>(info: DrawInfo<'a>, frame: &mut Frame) {
             frame_size.width.saturating_sub(outer_width), 
             frame_size.height.saturating_sub(outer_height), 
         ];
-        let mut outer_area = frame_size.inner(&Margin {
+        let mut outer_area = frame_size.inner(Margin {
             horizontal: delta_width / 2,
             vertical: delta_height / 2,
         });

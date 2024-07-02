@@ -29,12 +29,13 @@ pub fn confirm<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>)
 /// 
 /// - The selected index if the user pressed `enter`. 
 /// - `None` if the user pressed `escape`. 
-pub fn select<'a, T, U, G>(actions: T, over: &impl State, ctx: &mut Context<G>) -> usize
+pub fn select<'a, T, U, G>(msg: impl AsRef<str>, actions: T, over: &impl State, ctx: &mut Context<G>)
+    -> usize
 where
     T: AsRef<[U]>, 
     U: AsRef<str>, 
 {
-    Select{ actions: actions.as_ref(), selected: 0 }.run_over(over, ctx)
+    Select{ msg: msg.as_ref(), actions: actions.as_ref(), selected: 0 }.run_over(over, ctx)
 }
 
 /// Displays a blue dialog showing a message. 
@@ -96,6 +97,7 @@ impl Dialog for Confirm<'_> {
 
 /// Dialog to select one action among a set. 
 struct Select<'a, T> {
+    msg: &'a str, 
     actions: &'a [T], 
     selected: usize, 
 }
@@ -111,11 +113,13 @@ impl<'a, T: AsRef<str>> Dialog for Select<'a, T> {
             };
             format!("{prefix} {action}").into()
         };
-        let body: Vec<Line> = self.actions
+        let actions = self.actions
             .iter()
             .map(AsRef::as_ref)
             .enumerate()
-            .map(format_action)
+            .map(format_action);
+        let body: Vec<Line> = std::iter::once(self.msg.into())
+            .chain(actions)
             .collect();
         DrawInfo {
             title: "Select".into(), 

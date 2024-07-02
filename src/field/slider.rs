@@ -41,6 +41,10 @@ pub struct Slider<T> {
     pub step: T, 
     /// The default value. 
     pub default: T, 
+    /// Prefix visually inserted before the entered number. 
+    pub prefix: Option<Cow<'static, str>>, 
+    /// Suffix visually inserted after the entered number. 
+    pub suffix: Option<Cow<'static, str>>, 
 }
 
 impl<T> Field for Slider<T>
@@ -101,10 +105,16 @@ where
             true => Style::new().bold(), 
             false => Style::new(), 
         };
+        let [prefix, suffix] = [&self.prefix, &self.suffix]
+            .map(Option::as_ref)
+            .map(|x| x.map(AsRef::as_ref).map(Span::from))
+            .map(Option::unwrap_or_default);
         Line::from(vec![
+            prefix, 
             Span::styled("<", style(&self.value != self.range.start())), 
             Span::styled(val, style(focused)), 
-            Span::styled(">", style(&self.value != self.range.end()))
+            Span::styled(">", style(&self.value != self.range.end())), 
+            suffix, 
         ]).into()
     }
 
@@ -137,6 +147,8 @@ where
             range: T::min_value()..=T::max_value(), 
             step: T::one(), 
             default: T::zero(), 
+            prefix: None, 
+            suffix: None, 
         })
     }
 }
@@ -175,7 +187,19 @@ impl<T, const NAME: bool> Builder<T, NAME> {
     /// The amount that is added to or subtracted from the value. 
     pub fn step(self, step: T) -> Self {
         Builder(Slider{ step, ..self.0 })
-    }    
+    }
+
+    /// Prefix visually inserted before the entered number. 
+    pub fn prefix(self, prefix: impl Into<Cow<'static, str>>) -> Self {
+        let prefix = Some(prefix.into());
+        Builder(Slider{ prefix, ..self.0 })
+    }
+
+    /// Suffix visually inserted after the entered number. 
+    pub fn suffix(self, suffix: impl Into<Cow<'static, str>>) -> Self {
+        let suffix = Some(suffix.into());
+        Builder(Slider{ suffix, ..self.0 })
+    }
 }
 
 impl<T> Build for Builder<T, true>

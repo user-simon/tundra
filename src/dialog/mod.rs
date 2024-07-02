@@ -57,7 +57,7 @@ pub use form::form;
 /// [`dialog::confirm`]): 
 /// ```no_run
 /// use ratatui::style::Color;
-/// use tundra::{prelude::*, dialog::{Dialog, DrawInfo, Signal}};
+/// use tundra::{prelude::*, dialog::{Dialog, DrawInfo}};
 /// 
 /// struct Confirm {
 ///     msg: String, 

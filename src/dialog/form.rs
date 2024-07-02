@@ -217,17 +217,10 @@ macro_rules! form {
             }
         }
 
-        impl<'a> $crate::dialog::Dialog for __Form<'a> {
+        impl $crate::dialog::Dialog for __Form<'_> {
             type Out = __Option<Self>;
 
             fn format(&self) -> $crate::dialog::DrawInfo {
-                use std::{
-                    default::Default as _, 
-                    convert::From as _, 
-                };
-                use ratatui::text::Text;
-                use $crate::dialog::DrawInfo;
-
                 let name_lengths = [$(
                     __Field::name(&self.$id).len(), 
                 )*];
@@ -235,7 +228,7 @@ macro_rules! form {
                     .into_iter()
                     .max()
                     .unwrap_or(0);
-                let texts = [
+                let mut fields = [
                     $({
                         let focus = __Indices::$id as usize == self.__focus;
                         let name = __Field::name(&self.$id);
@@ -244,24 +237,7 @@ macro_rules! form {
                         __internal::format_field(name, body, focus, max_name, error)
                     },)*
                 ];
-                let header = (self.__message.len() != 0)
-                    .then(|| [Text::from(self.__message.as_ref()), Text::from("")])
-                    .into_iter()
-                    .flatten();
-                let body = header
-                    .chain(texts)
-                    .fold(Text::default(), |mut acc, body| {
-                        acc.extend(body);
-                        acc
-                    });
-
-                DrawInfo {
-                    title: __Cow::from(self.__title.as_ref()), 
-                    body, 
-                    hint: __Cow::from("Press (enter) to submit, (esc) to cancel..."), 
-                    wrap: __Option::None, 
-                    ..DrawInfo::default()
-                }
+                __internal::format_dialog(&mut fields, self.__message.as_ref(), self.__title.as_ref())
             }
             
             fn input(mut self, key: KeyEvent) -> $crate::Signal<Self> {
@@ -480,7 +456,6 @@ fn playground() {
 }
 
 pub mod internal {
-    use std::iter;
     use ratatui::{
         style::{Style, Stylize}, 
         text::{Line, Span}, 
@@ -563,7 +538,7 @@ pub mod internal {
                 };
                 style
             };
-            let padding: Span = iter::repeat(' ')
+            let padding: Span = std::iter::repeat(' ')
                 .take(align_to.saturating_sub(name.len()))
                 .collect::<String>()
                 .into();
@@ -575,13 +550,37 @@ pub mod internal {
 
         // indent remaining lines
         for line in &mut body.lines[1..] {
-            let indent: String = iter::repeat(' ')
+            let indent: String = std::iter::repeat(' ')
                 .take(align_to)
                 .chain(" │ ".chars())
                 .collect();
             line.spans.insert(0, indent.into());
         }
         body
+    }
+
+    #[inline(never)]
+    pub fn format_dialog<'a>(fields: &mut [Text<'a>], message: &'a str, title: &'a str) -> DrawInfo<'a> {
+        let message = (message.len() != 0)
+            .then(|| [Text::from(message), Text::from("")])
+            .into_iter()
+            .flatten();
+        let fields = fields
+            .into_iter()
+            .map(std::mem::take);
+        let body = message
+            .chain(fields)
+            .fold(Text::default(), |mut acc, body| {
+                acc.extend(body);
+                acc
+            });
+        DrawInfo {
+            title: Cow::from(title), 
+            body, 
+            hint: Cow::from("Press (enter) to submit, (esc) to cancel..."), 
+            wrap: None, 
+            ..DrawInfo::default()
+        }
     }
 
     #[inline(never)]

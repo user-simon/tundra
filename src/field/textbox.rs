@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use ratatui::prelude::*;
 use crate::prelude::*;
-use super::{*, builder::*};
+use super::*;
 
 /// An [input field](super) for entering single-line strings. 
 /// 
@@ -235,10 +235,7 @@ impl Default for Builder<false> {
 
 impl<const NAME: bool> Builder<NAME> {
     /// The user-visible name displayed by the input field. 
-    pub fn name(self, name: impl Into<Cow<'static, str>>) -> Builder<true>
-    where
-        Defined<NAME>: False, 
-    {
+    pub fn name(self, name: impl Into<Cow<'static, str>>) -> Builder<true> {
         let name = name.into();
         Builder(Textbox{ name, ..self.0 })
     }
@@ -253,13 +250,14 @@ impl<const NAME: bool> Builder<NAME> {
     pub fn hidden(self) -> Self {
         Builder(Textbox{ hidden: true, ..self.0 })
     }
+}
+
+impl Build for Builder<true> {
+    type Field = Textbox;
 
     /// If the name has been defined with [`Builder::name`], consumes the builder and returns the constructed
     /// [`Textbox`]. 
-    pub fn build(self) -> Textbox
-    where
-        Defined<NAME>: True, 
-    {
+    fn build(self) -> Textbox {
         self.0
     }
 }

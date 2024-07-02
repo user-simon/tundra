@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use ratatui::text::{Text, Line};
 use crate::prelude::*;
-use super::{*, builder::*};
+use super::*;
 
 /// An [input field](super) for selecting one item among a set. 
 /// 
@@ -107,10 +107,7 @@ impl Default for Builder {
 
 impl<const NAME: bool, const ITEMS: bool> Builder<NAME, ITEMS> {
     /// The user-visible name displayed by the input field. 
-    pub fn name(self, name: impl Into<Cow<'static, str>>) -> Builder<true, ITEMS>
-    where
-        Defined<NAME>: False, 
-    {
+    pub fn name(self, name: impl Into<Cow<'static, str>>) -> Builder<true, ITEMS> {
         let name = name.into();
         Builder(Radio{ name, ..self.0 })
     }
@@ -123,7 +120,6 @@ impl<const NAME: bool, const ITEMS: bool> Builder<NAME, ITEMS> {
     /// When the number of items is zero. 
     pub fn items<T>(self, items: impl IntoIterator<Item = T>) -> Builder<NAME, true>
     where
-        Defined<ITEMS>: False, 
         T: Into<Cow<'static, str>>, 
     {
         let items: Vec<_> = items
@@ -134,23 +130,73 @@ impl<const NAME: bool, const ITEMS: bool> Builder<NAME, ITEMS> {
 
         Builder(Radio{ items, ..self.0 })
     }
+}
 
+impl<const NAME: bool> Builder<NAME, true> {
     /// The index of the currently selected item. 
-    pub fn selected(self, index: usize) -> Self
-    where
-        Defined<ITEMS>: True, 
-    {
+    pub fn selected(self, index: usize) -> Self {
         let selected = index;
         Builder(Radio{ selected, ..self.0 })
     }
+}
 
-    /// If the name has been defined with [`Builder::name`] and the items have been defined with
-    /// [`Builder::items`], consumes the builder and returns the constructed [`Radio`]. 
-    pub fn build(self) -> Radio
-    where
-        Defined<NAME>: True, 
-        Defined<ITEMS>: True, 
-    {
+impl Build for Builder<true, true> {
+    type Field = Radio;
+
+    fn build(self) -> Self::Field {
         self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{prelude::*, field::*};
+
+    #[test]
+    fn input() {
+        let input = |key: KeyCode, radio: &mut Radio, expected: InputResult| {
+            let actual = radio.input(key.into());
+            assert_eq!(actual, expected);
+        };
+
+        let radio = &mut Radio::builder()
+            .name("")
+            .items(["One", "Two", "Three", "Four"])
+            .selected(0)
+            .build();
+        assert_eq!(radio.selected, 0);
+
+        input(KeyCode::Char('a'), radio, InputResult::Updated);
+        assert_eq!(radio.selected, 0);
+
+        input(KeyCode::Down, radio, InputResult::Consumed);
+        assert_eq!(radio.selected, 0);
+
+        input(KeyCode::Enter, radio, InputResult::Updated);
+        assert_eq!(radio.selected, 1);
+
+        for i in 1..=2 {
+            assert_eq!(radio.focus, i);
+            input(KeyCode::Down, radio, InputResult::Consumed);
+        }
+        assert_eq!(radio.focus, 3);
+
+        input(KeyCode::Down, radio, InputResult::Ignored);
+        assert_eq!(radio.focus, 3);
+
+        input(KeyCode::Backspace, radio, InputResult::Updated);
+        assert_eq!(radio.selected, 3);
+
+        for i in (1..=3).rev() {
+            assert_eq!(radio.focus, i);
+            input(KeyCode::Up, radio, InputResult::Consumed);
+        }
+        assert_eq!(radio.focus, 0);
+
+        input(KeyCode::Up, radio, InputResult::Ignored);
+        assert_eq!(radio.focus, 0);
+
+        input(KeyCode::F(1), radio, InputResult::Updated);
+        assert_eq!(radio.selected, 0);
     }
 }

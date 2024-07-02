@@ -9,7 +9,7 @@ use ratatui::{
     style::{Style, Stylize}, 
 };
 use crate::prelude::*;
-use super::{*, builder::*};
+use super::*;
 
 /// An [input field](super) for entering a numerical value. 
 /// 
@@ -143,10 +143,7 @@ where
 
 impl<T, const NAME: bool> Builder<T, NAME> {
     /// The user-visible name displayed by the input field. 
-    pub fn name(self, name: impl Into<Cow<'static, str>>) -> Builder<T, true>
-    where
-        Defined<NAME>: False, 
-    {
+    pub fn name(self, name: impl Into<Cow<'static, str>>) -> Builder<T, true> {
         let name = name.into();
         Builder(Slider{ name, ..self.0 })
     }
@@ -178,14 +175,18 @@ impl<T, const NAME: bool> Builder<T, NAME> {
     /// The amount that is added to or subtracted from the value. 
     pub fn step(self, step: T) -> Self {
         Builder(Slider{ step, ..self.0 })
-    }
+    }    
+}
+
+impl<T> Build for Builder<T, true>
+where
+    Slider<T>: Field
+{
+    type Field = Slider<T>;
 
     /// If the name has been defined with [`Builder::name`], consumes the builder and returns the constructed
     /// [`Slider`]. 
-    pub fn build(self) -> Slider<T>
-    where
-        Defined<NAME>: True, 
-    {
+    fn build(self) -> Slider<T> {
         self.0
     }
 }

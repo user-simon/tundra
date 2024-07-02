@@ -41,9 +41,9 @@ pub use {
 /// [form](crate::dialog::form!). More specifically, the DSL
 /// `Textbox{ name: "Password", value: "admin", hidden }` gets (loosely) translated as: 
 /// ```no_run
-/// # use tundra::field::{Field, textbox::{Textbox, Builder}};
+/// # use tundra::field::{Field, Build, textbox::{Textbox, Builder}};
 /// # let _ = 
-/// <Textbox as Field>::builder()
+/// Textbox::builder()
 ///     .name("Password")
 ///     .value("admin")
 ///     .hidden()
@@ -53,36 +53,55 @@ pub use {
 /// 
 /// Three restrictions are placed on field builder types: 
 /// 1. They must implement [`Default`]. 
-/// 2. All methods can take at most one argument. 
-/// 3. They must have a method with the signature `fn build(self) -> F`, where `F` is the field being
-/// instantiated. 
+/// 2. They must implement [`Build`]. 
+/// 3. All methods can take at most one argument. 
 /// 
-/// For maximal flexibility in the design of the builder types, the third restriction is not enforced by the
-/// trait system. This allows the `build` function to require compile-time predicates, such as requiring that
-/// a specific builder method was called. 
+/// For maximal flexibility, the second restriction is not added as a bound to [`Field::Builder`]. This
+/// allows the [`Build`] trait implementation to be predicated on type-state, such as requiring that a
+/// specific builder method was called. 
 /// 
-/// All library-provided fields require that at least the [`Field::name`] is defined. To facilitate such
-/// requirements, some syntax utilities are provided in this module, which may be used for custom field
-/// builders as well. 
+/// All library-provided fields require that at least the [`Field::name`] is defined. 
 /// 
 /// 
 /// # Example
 /// 
 /// A simple builder with no type state:
 /// ```no_run
+/// # use tundra::{KeyEvent, field::InputResult};
+/// # use ratatui::text::Text;
+/// use tundra::field::{Field, Build};
+/// 
+/// #[derive(Default)]
 /// struct MyField {
 ///     name: String, 
 ///     // ...
 /// }
 /// 
+/// impl Field for MyField {
+///     type Builder = Builder;
+///     
+///     // ...
+///     # type Value = ();
+///     # fn name(&self) -> &str { todo!() }
+///     # fn input(&mut self, _: KeyEvent) -> InputResult { todo!() }
+///     # fn format(&self, _: bool) -> Text { todo!() }
+///     # fn value(&self) -> &() { todo!() }
+///     # fn into_value(self) -> Self::Value { todo!() }
+/// }
+/// 
+/// #[derive(Default)]
 /// struct Builder(MyField);
 /// 
 /// impl Builder {
 ///     pub fn name(self, name: String) -> Self {
 ///         Builder(MyField{ name, ..self.0 })
 ///     }
+/// }
 /// 
-///     pub fn build(self) -> MyField {
+/// impl Build for Builder {
+///     type Field = MyField;
+/// 
+///     fn build(self) -> MyField {
 ///         self.0
 ///     }
 /// }
@@ -90,44 +109,51 @@ pub use {
 /// 
 /// A builder requiring that a name was supplied: 
 /// ```no_run
-/// use tundra::field::builder::*;
+/// # use tundra::{KeyEvent, field::InputResult};
+/// # use ratatui::text::Text;
+/// use tundra::field::{Field, Build};
 /// 
+/// #[derive(Default)]
 /// struct MyField {
 ///     name: String, 
 ///     // ...
 /// }
 /// 
-/// // type state parameter `NAME`, indicating whether the name has yet been supplied
+/// impl Field for MyField {
+///     type Builder = Builder<false>;
+///     
+///     // ...
+///     # type Value = ();
+///     # fn name(&self) -> &str { todo!() }
+///     # fn input(&mut self, _: KeyEvent) -> InputResult { todo!() }
+///     # fn format(&self, _: bool) -> Text { todo!() }
+///     # fn value(&self) -> &() { todo!() }
+///     # fn into_value(self) -> Self::Value { todo!() }
+/// }
+/// 
+/// // note the type state parameter `NAME`, indicating whether the name has yet been supplied
+/// #[derive(Default)]
 /// struct Builder<const NAME: bool>(MyField);
 /// 
-/// impl<const NAME: bool> Builder<NAME> {
-///     pub fn name(self, name: String) -> Builder<true>
-///     where
-///         Defined<NAME>: False, 
-///     {
+/// impl Builder<false> {
+///     // only callable if name has not yet been given
+///     pub fn name(self, name: String) -> Builder<true> {
 ///         Builder(MyField{ name, ..self.0 })
 ///     }
+/// }
 /// 
-///     // only callable if `Builder::name` was called first
-///     pub fn build(self) -> MyField
-///     where
-///         Defined<NAME>: True, 
-///     {
+/// impl Build for Builder<true> {
+///     type Field = MyField;
+/// 
+///     // only callable if name has been given
+///     fn build(self) -> MyField {
 ///         self.0
 ///     }
 /// }
-/// ```
-pub mod builder {
-    /// Indicates with a flag whether some property has been defined by the builder instance. 
-    pub struct Defined<const B: bool>;
+pub trait Build: Sized {
+    type Field: Field;
 
-    /// Implemented for `Defined<true>`; allows the syntax `where Defined<true>: True`. 
-    pub trait True {}
-    impl True for Defined<true> {}
-
-    /// Implemented for `Defined<false>`; allows the syntax `where Defined<false>: False`. 
-    pub trait False {}
-    impl False for Defined<false> {}
+    fn build(self) -> Self::Field;
 }
 
 /// Interface for user input fields. 
@@ -142,7 +168,8 @@ pub trait Field: Sized {
     /// The type of value entered by the user. 
     type Value;
     /// Points toward the builder type that may be used by the [form macro](crate::dialog::form!) for
-    /// instantiating the field. See the [`builder`] module for more information. 
+    /// instantiating the field. The type should implement [`Build`], but this is not added as a bound for
+    /// maximal flexibility. See the [`Build`] trait for more information. 
     type Builder: Default;
 
     /// Retrieves the user-visible name displayed by the input field. 
@@ -155,7 +182,7 @@ pub trait Field: Sized {
     fn value(&self) -> &Self::Value;
     /// Consumes the field and returns the current user-entered value. 
     fn into_value(self) -> Self::Value;
-    /// Constructs the [field builder](builder) using [`Default`]. 
+    /// Constructs the [field builder](Build) using [`Default`]. 
     fn builder() -> Self::Builder {
         Default::default()
     }

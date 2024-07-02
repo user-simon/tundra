@@ -1,7 +1,7 @@
 use std::{borrow::Cow, ops::RangeInclusive, iter};
 use ratatui::text::{Text, Line};
 use crate::prelude::*;
-use super::{*, builder::*};
+use super::*;
 
 /// An [input field](super) for toggling a set of items on/off. 
 /// 
@@ -236,10 +236,7 @@ impl Default for Builder {
 
 impl<const NAME: bool, const ITEMS: bool> Builder<NAME, ITEMS> {
     /// The user-visible name displayed by the input field. 
-    pub fn name(self, name: impl Into<Cow<'static, str>>) -> Builder<true, ITEMS>
-    where
-        Defined<NAME>: False, 
-    {
+    pub fn name(self, name: impl Into<Cow<'static, str>>) -> Builder<true, ITEMS> {
         let name = name.into();
         Builder(Toggle{ name, ..self.0 })
     }
@@ -252,23 +249,21 @@ impl<const NAME: bool, const ITEMS: bool> Builder<NAME, ITEMS> {
     /// When the number of items is zero. 
     pub fn items<T>(mut self, items: impl IntoIterator<Item = T>) -> Builder<NAME, true>
     where
-        Defined<ITEMS>: False, 
         T: Into<Cow<'static, str>>, 
     {
         self.0.set_items(items);
         Builder(self.0)
     }
+}
 
+impl<const NAME: bool> Builder<NAME, true> {
     /// The initial values of all items. 
     /// 
     /// 
     /// # Panics
     /// 
     /// When the number of values is not equal to the number of items. 
-    pub fn values(mut self, values: impl IntoIterator<Item = bool>) -> Self
-    where
-        Defined<ITEMS>: True, 
-    {
+    pub fn values(mut self, values: impl IntoIterator<Item = bool>) -> Self {
         self.0.set_values(values);
         Builder(self.0)
     }
@@ -276,10 +271,7 @@ impl<const NAME: bool, const ITEMS: bool> Builder<NAME, ITEMS> {
     /// The allowed range of toggled values. See the
     /// [type-level](Toggle#limiting-the-number-of-toggled-items) documentation for more information. Ensures
     /// that at least `range.start()` items are toggled. 
-    pub fn range(mut self, range: RangeInclusive<usize>) -> Self
-    where
-        Defined<ITEMS>: True, 
-    {
+    pub fn range(mut self, range: RangeInclusive<usize>) -> Self {
         let min = range
             .start()
             .clone();
@@ -294,14 +286,14 @@ impl<const NAME: bool, const ITEMS: bool> Builder<NAME, ITEMS> {
         }
         Builder(Toggle{ range, ..self.0 })
     }
+}
+
+impl Build for Builder<true, true> {
+    type Field = Toggle;
 
     /// If the name has been defined with [`Builder::name`] and the items have been defined with
     /// [`Builder::items`], consumes the builder and returns the constructed [`Toggle`]. 
-    pub fn build(self) -> Toggle
-    where
-        Defined<NAME>: True, 
-        Defined<ITEMS>: True, 
-    {
+    fn build(self) -> Toggle {
         self.0
     }
 }

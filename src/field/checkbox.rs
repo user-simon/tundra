@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use ratatui::text::Text;
 use crate::prelude::*;
-use super::{*, builder::*};
+use super::*;
 
 /// An [input field](super) for entering a boolean value. 
 /// 
@@ -72,10 +72,7 @@ impl Default for Builder {
 
 impl<const NAME: bool> Builder<NAME> {
     /// The user-visible name displayed by the input field. 
-    pub fn name(self, name: impl Into<Cow<'static, str>>) -> Builder<true>
-    where
-        Defined<NAME>: False, 
-    {
+    pub fn name(self, name: impl Into<Cow<'static, str>>) -> Builder<true> {
         let name = name.into();
         Builder(Checkbox{ name, ..self.0 })
     }
@@ -84,13 +81,38 @@ impl<const NAME: bool> Builder<NAME> {
     pub fn value(self, value: bool) -> Self {
         Builder(Checkbox{ value, ..self.0 })
     }
+}
 
-    /// If the name has been defined with [`Builder::name`], consumes the builder and returns the constructed
-    /// [`Checkbox`]. 
-    pub fn build(self) -> Checkbox
-    where
-        Defined<NAME>: True, 
-    {
+impl Build for Builder<true> {
+    type Field = Checkbox;
+
+    fn build(self) -> Checkbox {
         self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{prelude::*, field::*};
+
+    #[test]
+    fn input() {
+        let test = |key_code: KeyCode, expected: InputResult| {
+            let mut checkbox = Checkbox::builder()
+                .name("")
+                .value(false)
+                .build();
+            let actual = checkbox.input(key_code.into());
+            assert_eq!(actual, expected);
+        };
+        test(KeyCode::Char('a'), InputResult::Updated);
+        test(KeyCode::Char('b'), InputResult::Updated);
+        test(KeyCode::Char('1'), InputResult::Updated);
+        test(KeyCode::Enter, InputResult::Updated);
+        test(KeyCode::Esc, InputResult::Updated);
+
+        // these two must be ignored for form navigation to work properly
+        test(KeyCode::Up, InputResult::Ignored);
+        test(KeyCode::Down, InputResult::Ignored);
     }
 }

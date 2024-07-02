@@ -6,32 +6,41 @@
 /// The easiest way to get a hang of how to use the macro is to just examine the [examples](#examples), but a
 /// (somewhat) more formal description of the syntax is provided as well. 
 /// 
-/// The syntax expects first a set of fields, followed by a set of required metadata. The items should be
+/// The syntax expects first a set of fields, followed by a set of metadata. The items should be
 /// comma-separated (trailing commas are optional). 
 /// 
 /// 
 /// # Fields
 /// 
 /// A field consists of:
-/// - An identifier; used to reference the entered value after the form has been submitted by the user. 
+/// - An identifier; used to reference the entered value. 
 /// - A field type; any type that implements [`Field`](crate::field::Field). 
 /// - A set of parameters used when instantiating the field; these are translated into methods on the
-/// [field builder](crate::field::builder). There are two kinds of parameters allowed: those with one
-/// argument and those with none. Those with one argument are specified as `IDENTIFIER: VALUE`. Those with no
-/// argument are specified simply as `IDENTIFIER`. 
+/// [field builder](crate::field::Build). There are two kinds of parameters allowed: those with one argument
+/// and those with none. Those with one argument are specified as `IDENTIFIER: VALUE`. Those with no argument
+/// are specified simply as `IDENTIFIER`. 
+/// - (Optional) a set of control statements. A more detailed description of these are given
+/// [below](#field-validation). 
 /// 
-/// The syntax for declaring a field follows the form: `IDENTIFIER: TYPE{ PARAMS }`. For example, to declare
-/// a textbox with identifier `password`, and parameters `name = "Password"`, `value = "admin"`, and `hidden`
-/// (no argument). 
-/// ```text
+/// The syntax for declaring a field follows the form: `IDENTIFIER: TYPE{ PARAMS } CONTROL_STMTS`. 
+/// 
+/// For example, to declare a textbox without validation with identifier `password`, and parameters
+/// `name = "Password"`, `value = "admin"`, and `hidden` (no argument): 
+/// ```no_run
+/// # use tundra::{prelude::*, field::Textbox};
+/// # dialog::form!{
 /// password: Textbox{ name: "Password", value: "admin", hidden }, 
+/// # [title]: "", 
+/// # [context]: &mut Context::new().unwrap(), 
+/// # [background]: &(), 
+/// # };
 /// ```
 /// 
 /// The DSL `Textbox{ name: "Password", value: "admin", hidden }` gets (loosely) translated as: 
 /// ```no_run
-/// # use tundra::field::{Field, textbox::{Textbox, Builder}};
+/// # use tundra::field::{Field, Build, textbox::{Textbox, Builder}};
 /// # let _ = 
-/// <Textbox as Field>::builder()
+/// Textbox::builder()
 ///     .name("Password")
 ///     .value("admin")
 ///     .hidden()
@@ -39,52 +48,121 @@
 /// # ;
 /// ```
 /// 
-/// See the [`field::builder`](crate::field::builder) module for more information about builders. 
+/// See the [`field::Build`](crate::field::Build) module for more information on builders. 
 /// 
 /// 
-/// # Required Metadata
+/// # Metadata
 /// 
-/// In addition to the fields, the following metadata is required (in order): 
-/// 1. `title`; the user-visible title of the dialog box. Should be `impl Into<Cow<str>>`. 
-/// 2. `context`; the current [context](crate::Context). Should be `&mut Context<_>`. 
-/// 3. `background`; the state shown underneath the dialog box. Should be `&impl State`. 
-/// 
-/// The syntax for providing a piece of meta-data follows the form `[IDENTIFIER]: VALUE`. For example, to
+/// In addition to the fields of the form, some other pieces of data must be supplied in order to show the 
+/// form. These include a reference to the current [context](crate::Context) and the title of the dialog box. 
+/// These pieces of metadata are supplied with syntax of the form `[IDENTIFIER]: VALUE`. For example, to
 /// provide the title of the form as `"My form"`: 
-/// ```text
-/// [title]: "My form", 
+/// ```no_run
+/// # use tundra::{prelude::*, field::Checkbox};
+/// # dialog::form!{
+/// # foo: Checkbox{ name: "" }, 
+/// # [context]: &mut Context::new().unwrap(), 
+/// # [background]: &(), 
+/// [title]: "", 
+/// # };
+/// ```
+/// 
+/// The following metadata can be defined in any order: 
+/// - `title` (required); the user-visible title of the dialog box. Should be `impl Into<Cow<str>>`. 
+/// - `context` (required); the current [context](crate::Context). Should be `&mut Context<_>`. 
+/// - `background` (required); the state shown underneath the dialog box. Should be `&impl State`. 
+/// - `message`; user-visible string of text displayed above the fields. Should be `impl Into<Cow<str>>`. 
+/// - `validate`; validation function over the values entered by the user. See [below](#form-validation). 
+/// 
+/// 
+/// # Validation
+/// 
+/// Two kinds of validations are supported: field validation and form validation. Both are optional and place
+/// requirements on the values entered by the user, but operate on different scopes. Field validation is
+/// performed whenever the value of a field changes and is local to the field. Form validation is performed
+/// whenever the user attempts to submit the form and has global access to all fields. 
+/// 
+/// Since field validation is more localised, it can be used to provide more intuitive feedback by turning
+/// the name of the offending field red. 
+/// 
+/// Prefer field validation for simple checks that require only local knowledge of the fields, and form
+/// validation for checks that are either more complicated or require global knowledge of the fields (such
+/// as comparing the values of two fields against each other). 
+/// 
+/// A more in-depth description of the two kinds of validation is provided below. 
+/// 
+/// 
+/// ### Field validation
+/// 
+/// Field validation is provided on a per-field basis using control statements. Each control statement
+/// defines a boolean function over the entered value (the error condition) and an error message to be shown
+/// if the function returns `true`. Any number of control statements can be given per field. 
+/// 
+/// Whenever the value of a field is changed or the form is submitted (whichever happens first), it is
+/// checked against the error condition. If the error condition triggers, the name of the field turns red,
+/// and the error message is displayed if the user attempts to submit the form. For some fields (textboxes in
+/// particular), the error condition could be checked quite frequently and should therefore be fairly fast.
+/// For more complicated validation, prefer [form validation](#form-validation), which is only checked once
+/// the form is submitted. 
+/// 
+/// The syntax of a control statement follows the form `if ERR_CONDITION => MESSAGE`, where `ERR_CONDITION`
+/// is either a path to a function (e.g. `str::is_empty`) or a closure (e.g. `|&value| value == 123`), and
+/// `MESSAGE` is a value that implements `Into<Cow<str>>`. Several control statements are given by repeating
+/// the syntax, delimited by a space or newline. Note that the comma that separates different fields in the
+/// macro is given after all control statements. 
+/// 
+/// For example, to require that the password in the example from before is non-empty and not equal to
+/// "password1": 
+/// ```no_run
+/// # use tundra::{prelude::*, field::Textbox};
+/// # dialog::form!{
+/// password: Textbox{ name: "Password", value: "admin", hidden }
+///     if str::is_empty => "Password must not be empty"
+///     if |value| value == "password1" => "You can choose a better password than that!", 
+/// # [title]: "", 
+/// # [context]: &mut Context::new().unwrap(), 
+/// # [background]: &(), 
+/// # };
 /// ```
 /// 
 /// 
-/// # (Optional) Validation Function
+/// ### Form validation
 /// 
-/// Optionally, a validation function may be specified as the last piece of metadata. The entered user input
-/// is validated using this function before the form may be submitted. If the input fails to validate, a
-/// given error message is shown before the user is prompted to retry. 
+/// Form validation is provided through a function over the values of all fields. It can be used to place
+/// requirements on the relationships between fields or in cases where field validation is too complex to be
+/// performed each time a field is updated. 
 /// 
 /// The validation function accepts as argument a struct containing a reference to the values of all fields. 
-/// Since this struct is unspellable by application code, the function must be a closure. 
+/// Since this struct is unspellable by application code, the function must be a closure. It should return a
+/// value of `Result<(), impl AsRef<str>>`; `Ok` on validation success, and `Err` with a given error message
+/// otherwise. 
 /// 
-/// The validation function should return a value of `Result<(), impl AsRef<str>>`. On succeess, `Ok(())`
-/// should be returned, indicating that the entered values were valid. On failure, `Err` should be returned
-/// with the error message that is to be displayed to the user. 
-/// 
-/// The syntax for declaring a validation function follows the form `[validate]: |IDENTIFIER| EXPRESSION`. 
-/// For example, to validate that a slider `foo`'s value is non-zero: 
-/// ```text
-/// [validate]: |form| if form.foo == &0 {
-///     Err("Foo must be non-zero!")
+/// To enable form validation, supply a closure as the `validate` metadatum. For example, to validate that
+/// the value of slider `foo` is less than the value of slider `bar`: 
+/// ```no_run
+/// # use tundra::{prelude::*, field::Slider};
+/// # dialog::form!{
+/// # foo: Slider<u8>{ name: "" }, 
+/// # bar: Slider<u8>{ name: "" }, 
+/// # [title]: "", 
+/// # [context]: &mut Context::new().unwrap(), 
+/// # [background]: &(), 
+/// [validate]: |values| if values.foo >= values.bar {
+///     Err("Foo must be less than bar!")
 /// } else {
 ///     Ok(())
 /// }
+/// # };
 /// ```
+/// Note that the validation function closure may implement [`FnMut`], and can therefore cache values
+/// computed during validation. 
 /// 
 /// 
 /// # Returns
 /// 
 /// The return value of the macro is an [`Option`]: 
-/// - `Some` if the form was submitted. Contains the values of all fields as members of an
-/// unspellable struct. The identifiers of the values are the same as the corresponding fields. 
+/// - `Some` if the form was submitted. Contains the values of all fields as members of an unspellable
+/// struct. The identifiers of the values are the same as the corresponding fields. 
 /// - `None` if the form was cancelled. 
 /// 
 /// 
@@ -109,7 +187,7 @@
 ///     [background]: current_state, 
 /// };
 /// if let Some(values) = values {
-///     // type annotation is not required
+///     // type annotations are not required
 ///     let location: String = values.location;
 ///     let rent: u32 = values.rent;
 ///     let pets_allowed: bool = values.pets_allowed;
@@ -426,33 +504,6 @@ macro_rules! parse_form_meta {
         }
         __filter!(<> $(($default_id, $default_val))*)
     }};
-}
-
-#[test]
-fn playground() {
-    use crate::prelude::*;
-    use crate::field::*;
-
-    let mut ctx = Context::new().unwrap();
-
-    form!{
-        location: Textbox{ name: "Location" }
-            if str::is_empty => "Value must be non-empty"
-            if |value| value == "asdf" => "Must not be equal to asdf", 
-        rent: Slider<u32>{ name: "Monthly rent", range: 1..=5000, step: 1 }, 
-        pets_allowed: Checkbox{ name: "Pets allowed" }, 
-
-        [background]: &(), 
-        [context]: &mut ctx, 
-        [title]: "Register Rent Unit", 
-        [validate]: |values| {
-            if values.location.len() == *values.rent as usize {
-                Err("Error")
-            } else {
-                Ok(())
-            }
-        }, 
-    };
 }
 
 pub mod internal {

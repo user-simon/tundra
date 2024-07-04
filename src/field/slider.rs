@@ -101,7 +101,7 @@ where
 
     fn format(&self, focused: bool) -> Text {
         let val = format!("{}", self.value);
-        let style = |cond| match cond {
+        let style = |cond| match focused && cond {
             true => Style::new().bold(), 
             false => Style::new(), 
         };
@@ -110,11 +110,11 @@ where
             .map(|x| x.map(AsRef::as_ref).map(Span::from))
             .map(Option::unwrap_or_default);
         Line::from(vec![
-            prefix, 
             Span::styled("<", style(&self.value != self.range.start())), 
+            prefix, 
             Span::styled(val, style(focused)), 
-            Span::styled(">", style(&self.value != self.range.end())), 
             suffix, 
+            Span::styled(">", style(&self.value != self.range.end())), 
         ]).into()
     }
 

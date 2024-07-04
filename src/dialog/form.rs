@@ -250,25 +250,31 @@ macro_rules! form {
             field::Field as __Field, 
         };
 
+        // used to look up the index of a field by its name via `__Indices::$id as usize`. 
         #[allow(non_camel_case_types)]
         enum __Indices {$(
             $id, 
         )*}
 
+        // holds the owned values of all fields once the form is submitted. 
         #[allow(dead_code)]
         struct __Values {$(
             $id: <$type as __Field>::Value,
         )*}
-        
+
+        // holds the borrowed values of all fields for form validation. 
         #[allow(dead_code)]
         struct __BorrowedValues<'a> {$(
             $id: &'a <$type as __Field>::Value,
         )*}
 
+        // holds control callbacks and state for all fields, for implementing field validation. 
         struct __Control<'a> {$(
             $id: __internal::Control<'a, $type>, 
         )*}
 
+        // the form dialog itself. contains the input-fields as regular struct-fields, and some meta-data
+        // required for the [`Dialog`] implementation.  
         struct __Form<'a> {
             __focus: usize, 
             __control: __Control<'a>, 
@@ -279,6 +285,7 @@ macro_rules! form {
             )*
         }
 
+        // the number of fields in the form. 
         const __FIELDS: usize = [$(__Indices::$id),*].len();
 
         impl __Form<'_> {
@@ -323,6 +330,9 @@ macro_rules! form {
 
                 type Dispatch<'a> = fn(&mut __Form, KeyEvent) -> InputResult;
 
+                // holds a function pointer that dispatches to the `Field::input` implementation
+                // corresponding to each field. this can then be indexed by `self.__focus` to dispatch the
+                // input event to the correct field
                 const JUMP_TABLE: [Dispatch; __FIELDS] = [$(
                     |form, key| __internal::input_dispatch(&mut form.$id, &mut form.__control.$id, key)
                 ),*];
@@ -363,13 +373,16 @@ macro_rules! form {
                 };
                 form = out;
 
+                // perform field validation
                 let control_result = __internal::format_control_error(&[$(
                     (__Field::name(&form.$id), form.__control.$id.updated_result(&form.$id)), 
                 )*]);
+                // if field validation passes, perform form validation
                 let validation_result = match control_result {
                     __Result::Ok(()) => validate(form.values()), 
                     __Result::Err(e) => __Result::Err(__Cow::from(e)), 
                 };
+                // if either validation fails, show error message and continue. otherwise, return values
                 match validation_result {
                     __Result::Ok(()) => break __Option::Some(form.into_values()), 
                     __Result::Err(e) => $crate::dialog::error(e, bg, ctx), 
@@ -377,6 +390,7 @@ macro_rules! form {
             }
         }
 
+        // temporary container for all metadata, used for parsing. see [`parse_form_meta!`]
         struct __Meta<'a, A, B, C, D, E, X>
         where
             A: __Into<__Cow<'a, str>>, 
@@ -391,6 +405,8 @@ macro_rules! form {
             validate: E, 
         }
 
+        // instantiates the struct above with the given metadata, using the defaults defined under `else` for
+        // optional metadata that were not given
         let mut meta = $crate::parse_form_meta!{
             __Meta {
                 $($meta_id: $meta_expr,)*
@@ -400,6 +416,9 @@ macro_rules! form {
             }
         };
 
+        // field validation. for each field, creates a callback `Control::callback` bundling all
+        // control-statements for the field. this callback is invoked each time the field is updated. if the
+        // callback results in error, it is saved in `Control::state`
         let control = __Control {
             $($id: __internal::Control {
                 callback: &|value: &<$type as __Field>::Value| {
@@ -414,6 +433,8 @@ macro_rules! form {
                 state: __internal::ControlState::Unknown, 
             },)*
         };
+
+        // form validation. simply invokes `__Meta::validate`
         let validate = |values: __BorrowedValues| (meta.validate)(values).map_err(__Cow::from);
 
         let form = __Form {
@@ -434,6 +455,86 @@ macro_rules! form {
     }}
 }
 
+/// Utility macro for parsing form metadata as a struct instantiation. 
+/// 
+/// The problem being solved is (a) having a set of required fields and a set of optional fields --- the
+/// latter having defined default values --- and (b) allowing them to be given in any order. Hard-coding the
+/// metadata in the [`form`] macro arguments provides (a), but not (b). Making the metadata translate
+/// directly to a struct instantiation provides (b), but not (a). 
+/// 
+/// This macro attempts to solve this by:
+/// 1. Taking the metadata given by the application along with the defaults for all optional metadata. 
+/// 2. Recursively removing the defaults for the optional metadata that were given by the application. This
+/// provides (a). 
+/// 3. Taking the defined metadata and the remaining defaults (those that were left undefined by the
+/// application) and using them to instantiate a struct. This provides (b). 
+/// 
+/// This macro is agnostic to the struct being instantiated (taking the name of it as parameter) and its
+/// contents. 
+/// 
+/// The filtering is implemented using a nested macro definition, involves a lot of TT-munching, and has
+/// complexity `O(m · n)` --- where `m` is the number of metadata given by the application, and `n` is the
+/// number of defaults --- and is therefore likely very inefficient. Further work is needed to find a better
+/// way of accomplishing the same thing without sacrificing usability and error-handling. 
+/// 
+/// 
+/// # Examples
+/// 
+/// Assume that we have `Meta` defined as: 
+/// 
+/// ```
+/// struct Meta {
+///     required: u32, 
+///     optional: &'static str, 
+/// }
+/// ```
+/// 
+/// Without `optional` defined: 
+/// ```
+/// # use tundra::parse_form_meta;
+/// # struct Meta {
+/// #     required: u32, 
+/// #     optional: &'static str, 
+/// # }
+/// parse_form_meta!{
+///     Meta {
+///         required: 123, 
+///     } else {
+///         optional: "default", 
+///     }
+/// }
+/// # ;
+/// // yields:
+/// Meta {
+///     required: 123, 
+///     optional: "default", 
+/// }
+/// # ;
+/// ```
+/// 
+/// With `optional` defined: 
+/// ```
+/// # use tundra::parse_form_meta;
+/// # struct Meta {
+/// #     required: u32, 
+/// #     optional: &'static str, 
+/// # }
+/// parse_form_meta!{
+///     Meta {
+///         required: 123, 
+///         optional: "custom", 
+///     } else {
+///         optional: "default", 
+///     }
+/// }
+/// # ;
+/// // yields:
+/// Meta {
+///     required: 123, 
+///     optional: "custom", 
+/// }
+/// # ;
+/// ```
 #[macro_export]
 #[doc(hidden)]
 macro_rules! parse_form_meta {
@@ -506,6 +607,9 @@ macro_rules! parse_form_meta {
     }};
 }
 
+/// Private utilities used for implementing the form macro. 
+/// 
+/// Most of this consists of stuff that could be factored out from the form macro body to reduce codegen. 
 pub mod internal {
     use ratatui::{
         style::{Style, Stylize}, 
@@ -513,18 +617,21 @@ pub mod internal {
     };
     use crate::{dialog::*, field::{Field, InputResult}};
 
+    /// Holds the last known control state; [`ControlState::Unknown`] if it has never been tested. 
     pub enum ControlState<'a> {
         Unknown, 
         Ok, 
         Err(Cow<'a, str>), 
     }
 
+    /// Stores the callback to validate a field and the last known result of that callback. 
     pub struct Control<'a, T: Field> {
         pub callback: &'a dyn Fn(&T::Value) -> Result<(), Cow<'a, str>>, 
         pub state: ControlState<'a>, 
     }
 
     impl<'a, T: Field> Control<'a, T> {
+        /// Makes sure that the field has been validated and returns the last known error. 
         pub fn updated_result<'b>(&'b mut self, field: &T) -> Result<(), &'b str> {
             if let ControlState::Unknown = self.state {
                 self.update(field);
@@ -536,6 +643,7 @@ pub mod internal {
             }
         }
 
+        /// Validates a field by updating [`Control::state`]. 
         pub fn update(&mut self, field: &T) {
             self.state = match (self.callback)(field.value()) {
                 Ok(()) => ControlState::Ok, 
@@ -543,6 +651,7 @@ pub mod internal {
             };
         }
 
+        /// Whether the field is *known* to be invalid. 
         pub const fn is_err(&self) -> bool {
             match self.state {
                 ControlState::Unknown => false,
@@ -552,6 +661,7 @@ pub mod internal {
         }
     }
 
+    /// Delegates to [`Field::input`] and updates the [`Control::state`]. 
     #[inline(never)]
     pub fn input_dispatch<T: Field>(field: &mut T, control: &mut Control<T>, key: KeyEvent) -> InputResult {
         let result = field.input(key);
@@ -562,6 +672,7 @@ pub mod internal {
         result
     }
 
+    /// Formats a field for use in a form. 
     #[inline(never)]
     pub fn format_field<'a>(name: &'a str, mut body: Text<'a>, focused: bool, align_to: usize, error: bool)
         -> Text<'a>
@@ -610,6 +721,7 @@ pub mod internal {
         body
     }
 
+    /// Formats the form dialog from the formatted fields. 
     #[inline(never)]
     pub fn format_dialog<'a>(fields: &mut [Text<'a>], message: &'a str, title: &'a str) -> DrawInfo<'a> {
         let message = (message.len() != 0)
@@ -634,6 +746,7 @@ pub mod internal {
         }
     }
 
+    /// Takes a set of control states and constructs an error message from them. 
     #[inline(never)]
     pub fn format_control_error(results: &[(&str, Result<(), &str>)]) -> Result<(), String> {
         let messages: Vec<String> = results

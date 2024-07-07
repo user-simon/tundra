@@ -179,7 +179,7 @@
 /// // let ctx: &mut Context<_>
 /// 
 /// let values = dialog::form!{
-///     location: Textbox{ name: "Location" }, 
+///     location: Textbox{ name: "Location" } if str::is_empty => "Value required", 
 ///     rent: Slider<u32>{ name: "Monthly rent", range: 1..=5000, step: 50 }, 
 ///     pets_allowed: Checkbox{ name: "Pets allowed" }, 
 ///     [title]: "Register Rent Unit", 

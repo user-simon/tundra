@@ -198,7 +198,7 @@
 //! 
 //! let values = dialog::form!{
 //!     location: Textbox{ name: "Location" }, 
-//!     rent: Slider<u32>{ name: "Monthly rent", range: 1..=5000, step: 50 }, 
+//!     rent: Slider<u32>{ name: "Monthly rent", range: 1..=5000, step: 50, prefix: "$" }, 
 //!     pets_allowed: Checkbox{ name: "Pets allowed" }, 
 //!     [title]: "Register Rent Unit", 
 //!     [context]: ctx, 

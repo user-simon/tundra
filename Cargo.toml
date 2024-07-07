@@ -1,6 +1,6 @@
 [package]
 name = "tundra"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "A framework for building interactive applications for the terminal using Ratatui."
@@ -10,5 +10,5 @@ categories = ["command-line-interface"]
 
 [dependencies]
 crossterm = "0.27.0"
-num-traits = "0.2.18"
+num-traits = "0.2.19"
 ratatui = { version = "0.27.0", features = ["unstable-rendered-line-info"] }

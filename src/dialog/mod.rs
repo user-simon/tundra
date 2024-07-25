@@ -7,6 +7,7 @@
 //! - [`dialog::warning`] displays a warning. 
 //! - [`dialog::error`] displays an error. 
 //! - [`dialog::fatal`] displays a fatal error. 
+//! - [`dialog::message`] displays any kind of message. 
 //! - [`dialog::form!`] allows the user to enter information through a set of input fields. 
 //! 
 //! 
@@ -99,7 +100,7 @@ pub use form::form;
 /// let confirmed: bool = confirm(msg.into(), current_state, ctx);
 /// ```
 pub trait Dialog: Sized {
-    /// Type of the value to be returned from [`Dialog::run_over`] once the dialog has finished running. Th
+    /// Type of the value to be returned from [`Dialog::run_over`] once the dialog has finished running. The
     /// value being returned is given by [`Signal::Return`] from [`Dialog::input`]. 
     type Out;
 
@@ -111,8 +112,7 @@ pub trait Dialog: Sized {
 
     /// Runs the dialog to fruition over some background state. 
     /// 
-    /// This is a wrapper over [`State::run`] with added logic to draw the dialog box and background
-    /// state. 
+    /// This is a wrapper over [`State::run`] with added logic to draw the dialog box and background state.
     fn run_over<G>(self, background: &impl State, ctx: &mut Context<G>) -> Self::Out {
         Container{ content: self, background }
             .run(&mut ctx.chain_without_global())

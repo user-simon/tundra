@@ -7,6 +7,7 @@
 //! - [`dialog::warning`] displays a warning. 
 //! - [`dialog::error`] displays an error. 
 //! - [`dialog::fatal`] displays a fatal error. 
+//! - [`dialog::message`] displays any kind of message. 
 
 use ratatui::text::Line;
 use super::*;
@@ -40,29 +41,33 @@ where
 
 /// Displays a blue dialog showing a message. 
 pub fn info<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) {
-    message(msg.as_ref(), MessageLevel::Info, over, ctx)
+    message(msg.as_ref(), "Info", Color::Cyan, over, ctx)
 }
 
 /// Displays a yellow dialog showing a warning. 
 pub fn warning<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) {
-    message(msg.as_ref(), MessageLevel::Warning, over, ctx)
+    message(msg.as_ref(), "Warning", Color::Yellow, over, ctx)
 }
 
 /// Displays a red dialog showing an error message. 
 pub fn error<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) {
-    message(msg.as_ref(), MessageLevel::Error, over, ctx)
+    message(msg.as_ref(), "Error", Color::Red, over, ctx)
 }
 
 /// Displays a red dialog showing a fatal error message. 
 /// 
 /// No background state is drawn upon displaying a fatal error message. 
 pub fn fatal<G>(msg: impl AsRef<str>, ctx: &mut Context<G>) {
-    message(msg.as_ref(), MessageLevel::Fatal, &(), ctx)
+    message(msg.as_ref(), "Fatal error", Color::Red, &(), ctx)
 }
 
-/// Displays a dialog showing a message of specified [level](MessageLevel). 
-fn message<G>(msg: &str, level: MessageLevel, over: &impl State, ctx: &mut Context<G>) {
-    Message{ msg, level }.run_over(over, ctx)
+/// Displays a dialog showing a generic message. 
+/// 
+/// This is lower level than the other message dialog functions. Prefer the more specialised 
+/// [`dialog::info`], [`dialog::warning`], [`dialog::error`], or [`dialog:fatal`] unless you need the 
+/// customisation. 
+pub fn message<G>(msg: &str, title: &str, color: Color, over: &impl State, ctx: &mut Context<G>) {
+    Message{ msg, title, color }.run_over(over, ctx)
 }
 
 /// Dialog to confirm an action before proceeding. 
@@ -146,33 +151,20 @@ impl<'a, T: AsRef<str>> Dialog for Select<'a, T> {
     }
 }
 
-/// Defines the title and colour of a [`Message`] dialog. 
-enum MessageLevel {
-    Info, 
-    Warning, 
-    Error, 
-    Fatal, 
-}
-
 /// Dialog to simply show a message to the user. 
 struct Message<'a> {
     msg: &'a str, 
-    level: MessageLevel, 
+    title: &'a str, 
+    color: Color, 
 }
 
 impl Dialog for Message<'_> {
     type Out = ();
 
     fn format(&self) -> DrawInfo {
-        let (title, color) = match self.level {
-            MessageLevel::Info    => ("Info",        Color::Cyan), 
-            MessageLevel::Warning => ("Warning",     Color::Yellow), 
-            MessageLevel::Error   => ("Error",       Color::Red), 
-            MessageLevel::Fatal   => ("Fatal error", Color::Red), 
-        };
         DrawInfo {
-            title: title.into(), 
-            color, 
+            title: self.title.into(), 
+            color: self.color, 
             body: self.msg.into(), 
             hint: "Press any key to close...".into(), 
             ..Default::default()

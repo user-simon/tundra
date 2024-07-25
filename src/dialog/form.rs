@@ -741,7 +741,7 @@ pub mod internal {
             title: Cow::from(title), 
             body, 
             hint: Cow::from("Press (enter) to submit, (esc) to cancel..."), 
-            wrap: None, 
+            wrap: Some(Wrap{ trim: false }), 
             ..DrawInfo::default()
         }
     }

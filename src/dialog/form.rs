@@ -267,7 +267,7 @@ macro_rules! form {
                 if $control:expr => $control_err:literal
             )*
         ),+, 
-        // Required form meta data
+        // Form meta data
         $([$meta_id:ident]: $meta_expr:expr),*
         $(,)?
     ] => {{
@@ -764,18 +764,16 @@ pub mod internal {
     #[inline(never)]
     pub fn format_dialog<'a>(fields: &mut [Text<'a>], message: &'a str, title: &'a str) -> DrawInfo<'a> {
         let message = (message.len() != 0)
-            .then(|| [Text::from(message), Text::from("")])
+            .then(|| [Line::from(message), Line::default()])
             .into_iter()
             .flatten();
         let fields = fields
             .into_iter()
-            .map(std::mem::take);
+            .map(std::mem::take)
+            .flat_map(|text| text.lines);
         let body = message
             .chain(fields)
-            .fold(Text::default(), |mut acc, body| {
-                acc.extend(body);
-                acc
-            });
+            .collect();
         DrawInfo {
             title: Cow::from(title), 
             body, 

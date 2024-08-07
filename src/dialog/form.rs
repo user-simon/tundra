@@ -134,8 +134,10 @@
 /// 
 /// The validation function accepts as argument a struct containing a reference to the values of all fields. 
 /// Since this struct is unspellable by application code, the function must be a closure. It should return a
-/// value of `Result<(), impl AsRef<str>>`; `Ok` on validation success, and `Err` with a given error message
-/// otherwise. 
+/// value of `Result<T, impl AsRef<str>>`; `Ok(T)` on validation success, and `Err` with a given error
+/// message otherwise. The `Ok` value may be used to store values computed during validation (e.g. the result
+/// of parsing an entered string), and is available via the `Validated` field of the values returned from the
+/// macro. 
 /// 
 /// To enable form validation, supply a closure as the `validate` metadatum. For example, to validate that
 /// the value of slider `foo` is less than the value of slider `bar`: 
@@ -194,6 +196,34 @@
 /// }
 /// ```
 /// 
+/// To show a form with a [textbox](crate::field::Textbox) for entering an IP-address, parsing it as an
+/// [`Ipv4Addr`](std::net::Ipv4Addr) during validation: 
+/// 
+/// ```no_run
+/// use tundra::{prelude::*, field::*};
+/// use std::{str::FromStr, net::Ipv4Addr};
+/// 
+/// # let current_state = &();
+/// # let ctx = &mut Context::new().unwrap();
+/// // let current_state: &impl State
+/// // let ctx: &mut Context<_>
+/// 
+/// let values = dialog::form!{
+///     ip: Textbox{ name: "IP address" }, 
+///     [title]: "Enter IP", 
+///     [context]: ctx, 
+///     [background]: current_state, 
+///     [validate]: |values| match Ipv4Addr::from_str(values.ip) {
+///         Ok(ip) => Ok(ip), 
+///         Err(_) => Err("Invalid IP address"),  
+///     }, 
+/// };
+/// if let Some(values) = values {
+///    // type annoation is not required
+///    let ip: Ipv4Addr = values.Validated;
+/// }
+/// ```
+/// 
 /// To show a login prompt, checking the credentials before proceeding: 
 /// ```no_run
 /// use tundra::{prelude::*, field::*};
@@ -232,10 +262,12 @@ macro_rules! form {
                 ),+
                 $(,)?
             }
+            // Optional set of control statements for the field, implementing field validation
             $(
                 if $control:expr => $control_err:literal
             )*
         ),+, 
+        // Required form meta data
         $([$meta_id:ident]: $meta_expr:expr),*
         $(,)?
     ] => {{
@@ -258,9 +290,13 @@ macro_rules! form {
 
         // holds the owned values of all fields once the form is submitted. 
         #[allow(dead_code)]
-        struct __Values {$(
-            $id: <$type as __Field>::Value,
-        )*}
+        struct __Values<T> {
+            #[allow(non_snake_case)]
+            Validated: T, 
+            $(
+                $id: <$type as __Field>::Value,
+            )*
+        }
 
         // holds the borrowed values of all fields for form validation. 
         #[allow(dead_code)]
@@ -295,10 +331,13 @@ macro_rules! form {
                 )*}
             }
 
-            fn into_values(self) -> __Values {
-                __Values {$(
-                    $id: __Field::into_value(self.$id), 
-                )*}
+            fn into_values<T>(self, validated: T) -> __Values<T> {
+                __Values {
+                    Validated: validated, 
+                    $(
+                        $id: __Field::into_value(self.$id), 
+                    )*
+                }
             }
         }
 
@@ -358,12 +397,12 @@ macro_rules! form {
             }
         }
 
-        fn __run<'a, T>(
+        fn __run<'a, T, U>(
             mut form: __Form<'a>, 
             bg: &impl $crate::State, 
             ctx: &mut $crate::Context<T>, 
-            mut validate: impl std::ops::FnMut(__BorrowedValues) -> __Result<(), __Cow<'a, str>>, 
-        ) -> __Option<__Values> {
+            mut validate: impl std::ops::FnMut(__BorrowedValues) -> __Result<U, __Cow<'a, str>>, 
+        ) -> __Option<__Values<U>> {
             use $crate::dialog::Dialog as _;
 
             loop {
@@ -384,19 +423,19 @@ macro_rules! form {
                 };
                 // if either validation fails, show error message and continue. otherwise, return values
                 match validation_result {
-                    __Result::Ok(()) => break __Option::Some(form.into_values()), 
+                    __Result::Ok(ok) => break __Option::Some(form.into_values(ok)), 
                     __Result::Err(e) => $crate::dialog::error(e, bg, ctx), 
                 }
             }
         }
 
         // temporary container for all metadata, used for parsing. see [`parse_form_meta!`]
-        struct __Meta<'a, A, B, C, D, E, X>
+        struct __Meta<'a, A, B, C, D, E, X, Y>
         where
             A: __Into<__Cow<'a, str>>, 
             D: __Into<__Cow<'a, str>>, 
-            E: std::ops::FnMut(__BorrowedValues) -> __Result<(), X>, 
-            X: __Into<__Cow<'a, str>>, 
+            E: std::ops::FnMut(__BorrowedValues) -> __Result<X, Y>, 
+            Y: __Into<__Cow<'a, str>>, 
         {
             title: A, 
             context: &'a mut $crate::Context<B>, 

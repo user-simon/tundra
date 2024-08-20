@@ -23,7 +23,8 @@ use super::*;
 /// - `true` if the user pressed `y`. 
 /// - `false` if the user pressed `n` or `escape`. 
 pub fn confirm<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) -> bool {
-    Confirm{ msg: msg.as_ref() }.run_over(over, ctx)
+    let msg = msg.as_ref();
+    Confirm{ msg }.run_over(over, ctx)
 }
 
 /// Displays a blue dialog asking the user to select one item among a set. 
@@ -63,7 +64,6 @@ pub fn select_value<'a, T, G>(
     over: &impl State, 
     ctx: &mut Context<G>, 
 ) -> &'a T {
-    let items = items.as_ref();
     let dialog = Select {
         msg: msg.as_ref(), 
         get_label: |i: usize| items[i].0.as_ref(), 
@@ -88,7 +88,7 @@ pub fn select_action<T, U: State, G>(
     state: &U, 
     ctx: &mut Context<G>, 
 ) -> T {
-    select_value(msg, items.as_ref(), state, ctx)(state, ctx)
+    select_value(msg, items, state, ctx)(state, ctx)
 }
 
 /// Displays a blue dialog asking the user to select one action among a set. 
@@ -105,29 +105,29 @@ pub fn select_action_mut<T, U: State, G>(
     state: &mut U, 
     ctx: &mut Context<G>, 
 ) -> T {
-    select_value(msg, items.as_ref(), state, ctx)(state, ctx)
+    select_value(msg, items, state, ctx)(state, ctx)
 }
 
 /// Displays a blue dialog showing a message. 
 pub fn info<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) {
-    message(msg.as_ref(), "Info", Color::Cyan, over, ctx)
+    message(msg, "Info", Color::Cyan, over, ctx)
 }
 
 /// Displays a yellow dialog showing a warning. 
 pub fn warning<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) {
-    message(msg.as_ref(), "Warning", Color::Yellow, over, ctx)
+    message(msg, "Warning", Color::Yellow, over, ctx)
 }
 
 /// Displays a red dialog showing an error message. 
 pub fn error<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) {
-    message(msg.as_ref(), "Error", Color::Red, over, ctx)
+    message(msg, "Error", Color::Red, over, ctx)
 }
 
 /// Displays a red dialog showing a fatal error message. 
 /// 
 /// No background state is drawn upon displaying a fatal error message. 
 pub fn fatal<G>(msg: impl AsRef<str>, ctx: &mut Context<G>) {
-    message(msg.as_ref(), "Fatal error", Color::Red, &(), ctx)
+    message(msg, "Fatal error", Color::Red, &(), ctx)
 }
 
 /// Displays a dialog showing a generic message. 
@@ -135,7 +135,15 @@ pub fn fatal<G>(msg: impl AsRef<str>, ctx: &mut Context<G>) {
 /// This is lower level than the other message dialog functions. Prefer the more specialised 
 /// [`dialog::info`], [`dialog::warning`], [`dialog::error`], or [`dialog:fatal`] unless you need the 
 /// customisation. 
-pub fn message<G>(msg: &str, title: &str, color: Color, over: &impl State, ctx: &mut Context<G>) {
+pub fn message<G>(
+    msg: impl AsRef<str>, 
+    title: impl AsRef<str>, 
+    color: Color, 
+    over: &impl State, 
+    ctx: &mut Context<G>, 
+) {
+    let msg = msg.as_ref();
+    let title = title.as_ref();
     Message{ msg, title, color }.run_over(over, ctx)
 }
 

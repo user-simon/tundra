@@ -13,7 +13,7 @@ impl State for Tally {
     
     fn draw(&self, frame: &mut Frame) {
         let widget = Paragraph::new(self.value.to_string());
-        frame.render_widget(widget, frame.size());
+        frame.render_widget(widget, frame.area());
     }
     
     fn input(mut self, key: KeyEvent, ctx: &mut Context) -> Signal<Self> {

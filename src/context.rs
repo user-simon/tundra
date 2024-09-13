@@ -135,15 +135,15 @@ enum Environment {
 /// # ; Ok::<(), std::io::Error>(())
 /// ```
 /// 
-/// Constructing a context without automatic management of the terminal environment (this requires adding
-/// [`crossterm`] to the application's dependencies): 
+/// Constructing a context without automatic management of the terminal environment: 
 /// ```no_run
 /// use std::io;
-/// use crossterm::{
+/// use tundra::crossterm::{
+///     self, 
 ///     terminal::{self, EnterAlternateScreen, LeaveAlternateScreen}, 
 ///     cursor::{Hide, Show}, 
 /// };
-/// use ratatui::prelude::*;
+/// use tundra::ratatui::prelude::*;
 /// use tundra::{Terminal, Backend};
 /// # use tundra::prelude::*;
 /// 
@@ -202,12 +202,12 @@ impl<G> Context<G> {
     /// # Examples
     /// 
     /// ```no_run
-    /// use ratatui::{Terminal, layout::Rect};
+    /// use tundra::ratatui::{Terminal, layout::Size};
     /// 
     /// # use tundra::Context;
     /// # let ctx = Context::new().unwrap();
     /// // let ctx: &Context<_>
-    /// let size: Rect = ctx.apply(Terminal::size)?;
+    /// let size: Size = ctx.apply(Terminal::size)?;
     /// # Ok::<(), std::io::Error>(())
     /// ```
     pub fn apply<T>(&self, f: impl FnOnce(&Terminal) -> T) -> T {
@@ -225,7 +225,7 @@ impl<G> Context<G> {
     /// # Examples
     /// 
     /// ```no_run
-    /// use ratatui::Terminal;
+    /// use tundra::Terminal;
     /// # use tundra::Context;
     /// 
     /// # let mut ctx = Context::new().unwrap();
@@ -288,7 +288,8 @@ mod managed {
         panic, 
         sync::atomic::{AtomicBool, Ordering}, 
     };
-    use crossterm::{
+    use crate::crossterm::{
+        self, 
         terminal::{self, EnterAlternateScreen, LeaveAlternateScreen}, 
         cursor::{Hide, Show}, 
     };

@@ -1,6 +1,8 @@
 use std::convert::Infallible;
-use crossterm::event::{self, Event};
-use crate::prelude::*;
+use crate::{
+    crossterm::event::{self, Event}, 
+    prelude::*, 
+};
 
 /// Short-hand for the type of error that can occur in a [`State`]. 
 /// 
@@ -76,8 +78,8 @@ pub enum Signal<T: State> {
 /// A state with a tally that increases when the user presses `up`: 
 /// 
 /// ```no_run
-/// use ratatui::widgets::Paragraph;
 /// use tundra::prelude::*;
+/// use ratatui::widgets::Paragraph;
 /// 
 /// struct Tally {
 ///     value: u32, 

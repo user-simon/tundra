@@ -68,7 +68,7 @@ pub use {
 /// A simple builder with no type state:
 /// ```no_run
 /// # use tundra::{KeyEvent, field::InputResult};
-/// # use ratatui::text::Text;
+/// # use tundra::ratatui::text::Text;
 /// use tundra::field::{Field, Build};
 /// 
 /// #[derive(Default)]
@@ -110,7 +110,7 @@ pub use {
 /// A builder requiring that a name was supplied: 
 /// ```no_run
 /// # use tundra::{KeyEvent, field::InputResult};
-/// # use ratatui::text::Text;
+/// # use tundra::ratatui::text::Text;
 /// use tundra::field::{Field, Build};
 /// 
 /// #[derive(Default)]

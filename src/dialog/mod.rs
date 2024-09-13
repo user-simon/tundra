@@ -60,7 +60,7 @@ pub use form::form;
 /// Creating a custom confirmation dialog (this is more or less the same as the one provided through 
 /// [`dialog::confirm`]): 
 /// ```no_run
-/// use ratatui::style::Color;
+/// use tundra::ratatui::style::Color;
 /// use tundra::{prelude::*, dialog::{Dialog, DrawInfo}};
 /// 
 /// struct Confirm {
@@ -151,7 +151,7 @@ impl<T: Dialog> State for T {
 /// To draw a red dialog with title "Attention!", body "You are an ugly boy.", and hint "Press any key to
 /// accept...": 
 /// ```no_run
-/// # use ratatui::style::Color;
+/// use tundra::ratatui::style::Color;
 /// # use tundra::dialog::DrawInfo;
 /// # let _ = 
 /// DrawInfo {
@@ -271,7 +271,7 @@ fn draw_dialog<'a>(info: DrawInfo<'a>, frame: &mut Frame) {
         .italic();
 
     // compute the required inner dimensions
-    let frame_size = frame.size();
+    let frame_size = frame.area();
     let inner_width = (frame_size.width * width_percentage as u16) / 100;
     let [hint_height, body_height] = [&hint, &body].map(|x|
         x.line_count(inner_width) as u16

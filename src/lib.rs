@@ -22,17 +22,18 @@
 //! 
 //! # Getting Started
 //! 
-//! Add Tundra and Ratatui to the project dependencies, and note that the version of Ratatui used must be
-//! [compatible](https://doc.rust-lang.org/cargo/reference/resolver.html#semver-compatibility) with the one
-//! used by Tundra: 
+//! Add Tundra to the project dependencies:
 //! ```text
-//! $ cargo add tundra ratatui@0.27
+//! $ cargo add tundra
 //! ```
 //! 
 //! Next, import the [Tundra prelude](prelude), exposing symbols required in virtually all applications: 
 //! ```no_run
 //! use tundra::prelude::*;
 //! ```
+//! 
+//! Note that [Ratatui](ratatui) and [Crossterm](crossterm) are re-exported by the prelude to avoid
+//! dependency hell. 
 //! 
 //! 
 //! # Basic Usage
@@ -62,7 +63,7 @@
 //! To define the event loop of the state, implement the [`State`] trait. 
 //! 
 //! ```no_run
-//! use ratatui::widgets::Paragraph;
+//! use tundra::ratatui::widgets::Paragraph;
 //! # use tundra::prelude::*;
 //! # struct Tally{ value: u32 };
 //! 
@@ -252,6 +253,10 @@ pub mod dialog;
 pub mod field;
 mod state;
 
+// Re-export Ratatui and Crossterm to avoid dependency hell. 
+pub use ratatui;
+pub use ratatui::crossterm;
+
 #[doc(no_inline)]
 pub use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -267,6 +272,8 @@ pub use crate::{
 pub mod prelude {
     #[doc(no_inline)]
     pub use super::{
+        ratatui, 
+        crossterm, 
         dialog, 
         KeyCode, KeyEvent, KeyModifiers, Frame, 
         Signal, State, 

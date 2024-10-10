@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::io;
 use ratatui::{layout::*, style::*, widgets::*};
@@ -27,6 +28,7 @@ impl Manager {
         const MSG: &str = "\
             (ctrl + a) Add new rent unit\n\
             (ctrl + r) Remove selected rent unit\n\
+            (ctrl + e) Evict tenant at selected rent unit\n\
             (ctrl + h) Show this help message\n\
             (escape)   Quit the application\
         ";
@@ -68,6 +70,16 @@ impl Manager {
             self.table_state.borrow_mut().select_first();
         }
     }
+
+    /// Tries evicting tentant at selected location. Unfortunately, this tends to fail, in which case an
+    /// error message is shown with [`dialog::error`]. 
+    fn evict_tentant(&self, ctx: &mut Context) {
+        let Some(_) = self.table_state.borrow().selected() else {
+            return
+        };
+        // landlords are evil
+        dialog::error("Failed evicting tenant", self, ctx);
+    }
 }
 
 impl State for Manager {
@@ -85,6 +97,7 @@ impl State for Manager {
             // delegate commands
             (KeyCode::Char('a'), true) => self.enter_new_unit(ctx), 
             (KeyCode::Char('r'), true) => self.remove_unit(ctx), 
+            (KeyCode::Char('e'), true) => self.evict_tentant(ctx), 
             (KeyCode::Char('h'), true) => self.show_help(ctx), 
             // exit the application
             (KeyCode::Esc, false) => return Signal::Return(()), 

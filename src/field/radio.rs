@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use ratatui::text::{Text, Line};
+use ratatui::{style::{Style, Stylize}, text::{Line, Span, Text}};
 use crate::prelude::*;
 use super::*;
 
@@ -20,9 +20,14 @@ pub struct Radio {
     /// The user-visible names of the items that can chosen between. 
     pub items: Vec<Cow<'static, str>>, 
     /// Index of the currently selected item. 
-    pub selected: usize, 
-    /// Index of the currently focused item. 
-    focus: usize, 
+    selected: usize, 
+}
+
+impl Radio {
+    /// Maximum possible index of the selected item. Defined for explicitness. 
+    fn max_selected(&self) -> usize {
+       self.items.len() - 1 
+    }
 }
 
 impl Field for Radio {
@@ -35,45 +40,36 @@ impl Field for Radio {
 
     fn input(&mut self, key: KeyEvent) -> InputResult {
         match key.code {
-            // move focused item up/down
-            KeyCode::Up if self.focus > 0 => {
-                self.focus -= 1;
-                InputResult::Consumed
-            }
-            KeyCode::Down if self.focus < (self.items.len() - 1) => {
-                self.focus += 1;
-                InputResult::Consumed
-            }
-
-            // we are the top/bottom of the items, no change
-            KeyCode::Up | KeyCode::Down => InputResult::Ignored, 
-
-            // selected the focused item
-            _ => {
-                self.selected = self.focus;
+            // move selected item left/right
+            KeyCode::Left => {
+                self.selected = self.selected
+                    .checked_sub(1)
+                    .unwrap_or(self.max_selected());
                 InputResult::Updated
             }
+            KeyCode::Right => {
+                self.selected = if self.selected == self.max_selected() {
+                    0
+                } else {
+                    self.selected + 1
+                };
+                InputResult::Updated
+            }
+            _ => InputResult::Ignored, 
         }
     }
 
     fn format(&self, focused: bool) -> Text {
-        let format_item = |(i, item)| {
-            let symbol = match i == self.selected {
-                true  => '●', 
-                false => ' ', 
-            };
-            match focused && i == self.focus {
-                true => format!("[{symbol}] {item}"), 
-                false => format!("({symbol}) {item}"), 
-            }
+        let value = self.items[self.selected].to_string();
+        let style = match focused {
+            true => Style::new().bold(), 
+            false => Style::new(), 
         };
-        self.items
-            .iter()
-            .enumerate()
-            .map(format_item)
-            .map(Line::from)
-            .collect::<Vec<_>>()
-            .into()
+        Line::from(vec![
+            Span::from("<"), 
+            Span::styled(value, style), 
+            Span::from(">"), 
+        ]).into()
     }
 
     fn value(&self) -> &Self::Value {
@@ -97,10 +93,9 @@ pub struct Builder<const NAME: bool = false, const ITEMS: bool = false>(Radio);
 impl Default for Builder {
     fn default() -> Self {
         Self(Radio {
-            name: Default::default(),
-            items: Default::default(),
-            selected: 0,
-            focus: 0,
+            name: Default::default(), 
+            items: Default::default(), 
+            selected: 0, 
         })
     }
 }
@@ -166,37 +161,21 @@ mod tests {
             .build();
         assert_eq!(radio.selected, 0);
 
-        input(KeyCode::Char('a'), radio, InputResult::Updated);
-        assert_eq!(radio.selected, 0);
-
-        input(KeyCode::Down, radio, InputResult::Consumed);
-        assert_eq!(radio.selected, 0);
-
-        input(KeyCode::Enter, radio, InputResult::Updated);
-        assert_eq!(radio.selected, 1);
-
-        for i in 1..=2 {
-            assert_eq!(radio.focus, i);
-            input(KeyCode::Down, radio, InputResult::Consumed);
-        }
-        assert_eq!(radio.focus, 3);
-
-        input(KeyCode::Down, radio, InputResult::Ignored);
-        assert_eq!(radio.focus, 3);
-
-        input(KeyCode::Backspace, radio, InputResult::Updated);
+        input(KeyCode::Left, radio, InputResult::Updated);
         assert_eq!(radio.selected, 3);
 
-        for i in (1..=3).rev() {
-            assert_eq!(radio.focus, i);
-            input(KeyCode::Up, radio, InputResult::Consumed);
+        input(KeyCode::Left, radio, InputResult::Updated);
+        assert_eq!(radio.selected, 2);
+
+        input(KeyCode::Left, radio, InputResult::Updated);
+        assert_eq!(radio.selected, 1);
+
+        for i in 2..=3 {
+            input(KeyCode::Right, radio, InputResult::Updated);
+            assert_eq!(radio.selected, i);
         }
-        assert_eq!(radio.focus, 0);
 
-        input(KeyCode::Up, radio, InputResult::Ignored);
-        assert_eq!(radio.focus, 0);
-
-        input(KeyCode::F(1), radio, InputResult::Updated);
+        input(KeyCode::Right, radio, InputResult::Updated);
         assert_eq!(radio.selected, 0);
     }
 }

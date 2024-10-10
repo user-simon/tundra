@@ -101,6 +101,11 @@ pub fn info<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) {
     message(msg, "Info", Color::Cyan, over, ctx)
 }
 
+/// Displays a blue dialog showing a help message. 
+pub fn help<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) {
+    message(msg, "Help", Color::Cyan, over, ctx)
+}
+
 /// Displays a yellow dialog showing a warning. 
 pub fn warning<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) {
     message(msg, "Warning", Color::Yellow, over, ctx)

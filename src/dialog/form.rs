@@ -134,10 +134,13 @@
 /// 
 /// The validation function accepts as argument a struct containing a reference to the values of all fields. 
 /// Since this struct is unspellable by application code, the function must be a closure. It should return a
-/// value of `Result<T, impl AsRef<str>>`; `Ok(T)` on validation success, and `Err` with a given error
-/// message otherwise. The `Ok` value may be used to store values computed during validation (e.g. the result
-/// of parsing an entered string), and is available via the `Validated` field of the values returned from the
+/// value of `Result<T, impl ToString>`; `Ok(T)` on validation success, and `Err` with a given error
+/// otherwise. The `Ok` value may be used to store values computed during validation (e.g. the result of
+/// parsing an entered string), and is available via the `Validated` field of the values returned from the
 /// macro. 
+/// 
+/// Note that the macro has special handling of [`str`] and [`String`] error types such that they are not
+/// needlessly reallocated. 
 /// 
 /// To enable form validation, supply a closure as the `validate` metadatum. For example, to validate that
 /// the value of slider `foo` is less than the value of slider `bar`: 
@@ -213,10 +216,7 @@
 ///     [title]: "Enter IP", 
 ///     [context]: ctx, 
 ///     [background]: current_state, 
-///     [validate]: |values| match Ipv4Addr::from_str(values.ip) {
-///         Ok(ip) => Ok(ip), 
-///         Err(_) => Err("Invalid IP address"),  
-///     }, 
+///     [validate]: |values| Ipv4Addr::from_str(values.ip), 
 /// };
 /// if let Some(values) = values {
 ///    // type annoation is not required
@@ -435,7 +435,7 @@ macro_rules! form {
             A: __Into<__Cow<'a, str>>, 
             D: __Into<__Cow<'a, str>>, 
             E: std::ops::FnMut(__BorrowedValues) -> __Result<X, Y>, 
-            Y: __Into<__Cow<'a, str>>, 
+            Y: std::string::ToString, 
         {
             title: A, 
             context: &'a mut $crate::Context<B>, 
@@ -457,7 +457,7 @@ macro_rules! form {
 
         // field validation. for each field, creates a callback `Control::callback` bundling all
         // control-statements for the field. this callback is invoked each time the field is updated. if the
-        // callback results in error, it is saved in `Control::state`
+        // callback results in error, it is saved in `Control::state`. 
         let control = __Control {
             $($id: __internal::Control {
                 callback: &|value: &<$type as __Field>::Value| {
@@ -473,8 +473,16 @@ macro_rules! form {
             },)*
         };
 
-        // form validation. simply invokes `__Meta::validate`
-        let validate = |values: __BorrowedValues| (meta.validate)(values).map_err(__Cow::from);
+        // form validation. invokes `__Meta::validate` and uses autoref specialisation to construct a Cow
+        // from the error type (which might not implement Into<Cow<str>>) without needless allocation. based
+        // on dtolnay's guide at https://github.com/dtolnay/case-studies/tree/master/autoref-specialization. 
+        // note that the bound ToString on the error type in __Meta is not strictly needed but is used for
+        // nicer error handling (which works since Into<Cow<str>> implies ToString)
+        let validate = |values: __BorrowedValues| (meta.validate)(values).map_err(|e| {
+            use __internal::make_cow::{ViaIntoCow, ViaToString};
+
+            (&e).tag().make_cow(e)
+        });
 
         let form = __Form {
             __focus: 0, 
@@ -799,6 +807,60 @@ pub mod internal {
             true => Ok(()), 
             false => Err(messages.join("\n")), 
         }
+    }
+
+    /// Implements autoref specialisation to construct a [`Cow`](std::borrow::Cow) from different types
+    /// without needless allocations. 
+    /// 
+    /// The [`Cow`](std::borrow::Cow) is constructed from either `impl Into<Cow>` simply via `.into()` or
+    /// `impl ToString` via `.to_string().into()`. This ensures that [`String`] is not needlessly cloned and
+    /// that [`str`] is not needlessly reallocated on the heap while allowing other values such as error
+    /// types. 
+    /// 
+    /// Implementation is based on
+    /// [dtolnay's guide](https://github.com/dtolnay/case-studies/tree/master/autoref-specialization). 
+    /// 
+    /// 
+    /// # Examples
+    /// ```
+    /// # use std::borrow::Cow;
+    /// use tundra::dialog::form::internal::make_cow::{ViaIntoCow, ViaToString};
+    /// 
+    /// let str = "This is a &str type";
+    /// let string = String::from("This is a String type");
+    /// let integer = 123;
+    /// 
+    /// let _: Cow<str> = (&str).tag().make_cow(str); // uses Into<Cow>
+    /// let _: Cow<str> = (&string).tag().make_cow(string); // uses Into<Cow>
+    /// let _: Cow<str> = (&integer).tag().make_cow(integer); // uses ToString
+    /// ```
+    pub mod make_cow {
+        use std::borrow::Cow;
+
+        pub struct TagIntoCow;
+        pub struct TagToString;
+
+        impl TagIntoCow {
+            pub fn make_cow<'a>(&self, value: impl Into<Cow<'a, str>>) -> Cow<'a, str> {
+                value.into()
+            }
+        }
+
+        impl TagToString {
+            pub fn make_cow(&self, value: impl ToString) -> Cow<'static, str> {
+                value.to_string().into()
+            }
+        }
+
+        pub trait ViaIntoCow {
+            fn tag(&self) -> TagIntoCow{ TagIntoCow }
+        }
+        pub trait ViaToString {
+            fn tag(&self) -> TagToString{ TagToString }
+        }
+
+        impl<'a, T: Into<std::borrow::Cow<'a, str>>> ViaIntoCow for T {}
+        impl<T: ToString> ViaToString for &T {}
     }
 }
 

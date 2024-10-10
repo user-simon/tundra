@@ -477,7 +477,7 @@ macro_rules! form {
         // from the error type (which might not implement Into<Cow<str>>) without needless allocation. based
         // on dtolnay's guide at https://github.com/dtolnay/case-studies/tree/master/autoref-specialization. 
         // note that the bound ToString on the error type in __Meta is not strictly needed but is used for
-        // nicer error handling (which works since Into<Cow<str>> implies ToString)
+        // nicer error handling (which works since Into<Cow<str>> typically implies ToString)
         let validate = |values: __BorrowedValues| (meta.validate)(values).map_err(|e| {
             use __internal::make_cow::{ViaIntoCow, ViaToString};
 

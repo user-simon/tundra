@@ -1,16 +1,4 @@
 //! Defines simple, mainly informational dialogs. 
-//! 
-//! The following dialogs are defined in this module: 
-//! - [`dialog::confirm`] asks the user to confirm an action before proceeding. 
-//! - [`dialog::select_index`] asks the user to select one item among a set. 
-//! - [`dialog::select_value`] asks the user to select one value among a set. 
-//! - [`dialog::select_action`] asks the user to select one action among a set. 
-//! - [`dialog::select_action_mut`] asks the user to select one action among a set. 
-//! - [`dialog::info`] displays a message. 
-//! - [`dialog::warning`] displays a warning. 
-//! - [`dialog::error`] displays an error. 
-//! - [`dialog::fatal`] displays a fatal error. 
-//! - [`dialog::message`] displays any kind of message. 
 
 use ratatui::text::Line;
 use super::*;
@@ -125,7 +113,8 @@ pub fn error<G>(msg: impl AsRef<str>, over: &impl State, ctx: &mut Context<G>) {
 
 /// Displays a red dialog showing a fatal error message. 
 /// 
-/// No background state is drawn upon displaying a fatal error message. 
+/// No background state is drawn upon displaying a fatal error message, following the assumption that the
+/// the program is about to close. 
 pub fn fatal<G>(msg: impl AsRef<str>, ctx: &mut Context<G>) {
     message(msg, "Fatal error", Color::Red, &(), ctx)
 }
@@ -133,7 +122,7 @@ pub fn fatal<G>(msg: impl AsRef<str>, ctx: &mut Context<G>) {
 /// Displays a dialog showing a generic message. 
 /// 
 /// This is lower level than the other message dialog functions. Prefer the more specialised 
-/// [`dialog::info`], [`dialog::warning`], [`dialog::error`], or [`dialog:fatal`] unless you need the 
+/// [`dialog::info`], [`dialog::warning`], [`dialog::error`], or [`dialog::fatal`] unless you need the 
 /// customisation. 
 pub fn message<G>(
     msg: impl AsRef<str>, 

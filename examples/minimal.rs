@@ -8,11 +8,11 @@ impl State for MyState {
     type Out = ();
     type Global = ();
 
-    fn draw(&self, _frame: &mut Frame) {
+    fn draw(&self, frame: &mut Frame) {
         todo!("Draw the state using Ratatui")
     }
 
-    fn input(self, _key: KeyEvent, _ctx: &mut Context) -> Signal<Self> {
+    fn input(self, key: KeyEvent, ctx: &mut Context) -> Signal<Self> {
         todo!("Handle key press events")
     }
 }

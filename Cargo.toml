@@ -9,5 +9,6 @@ keywords = ["terminal", "tui", "ratatui"]
 categories = ["command-line-interface"]
 
 [dependencies]
+bitvec = "1.0.1"
 num-traits = "0.2.19"
 ratatui = { version = "0.28.0", features = ["unstable-rendered-line-info"] }

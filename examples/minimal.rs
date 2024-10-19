@@ -1,3 +1,6 @@
+// ↓ REMOVE THIS ↓
+#![allow(unused_variables)]
+
 use std::io;
 use tundra::prelude::*;
 

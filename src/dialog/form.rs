@@ -63,7 +63,7 @@
 /// # foo: Checkbox{ name: "" }, 
 /// # [context]: &mut Context::new().unwrap(), 
 /// # [background]: &(), 
-/// [title]: "", 
+/// [title]: "My form", 
 /// # };
 /// ```
 /// 
@@ -203,8 +203,8 @@
 /// [`Ipv4Addr`](std::net::Ipv4Addr) during validation: 
 /// 
 /// ```no_run
-/// use tundra::{prelude::*, field::*};
 /// use std::{str::FromStr, net::Ipv4Addr};
+/// use tundra::{prelude::*, field::*};
 /// 
 /// # let current_state = &();
 /// # let ctx = &mut Context::new().unwrap();
@@ -219,7 +219,7 @@
 ///     [validate]: |values| Ipv4Addr::from_str(values.ip), 
 /// };
 /// if let Some(values) = values {
-///    // type annoation is not required
+///    // type annotation is not required
 ///    let ip: Ipv4Addr = values.Validated;
 /// }
 /// ```

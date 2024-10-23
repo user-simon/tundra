@@ -35,11 +35,10 @@ pub mod form;
 
 use std::borrow::Cow;
 use ratatui::{
-    Frame, 
+    layout::*, 
+    widgets::*, Frame, 
     style::{Color, Stylize}, 
-    text::Text, 
-    widgets::{*, block::Title}, 
-    layout::{Rect, Layout, Constraint, Margin}, 
+    text::{Line, Text}, 
 };
 use crate::prelude::*;
 
@@ -184,7 +183,7 @@ pub struct DrawInfo<'a> {
     pub wrap: Option<Wrap>, 
     /// Function constructing a [`Title`] from a string. Default: turns the title uppercase and inserts a
     /// space on either side of it. 
-    pub create_title: fn(Cow<'a, str>) -> Title<'a>, 
+    pub create_title: fn(Cow<'a, str>) -> Line<'a>, 
     /// Function constructing the [`Block`], which represents the dialog box. Note that two properties are
     /// later overriden: 
     /// - `Block::fg()`, which is set to [`color`](DrawInfo::color). 
@@ -282,7 +281,7 @@ fn draw_dialog<'a>(info: DrawInfo<'a>, frame: &mut Frame) {
     let inner_area = {
         let title = create_title(title);
         let block = create_block()
-            .title(title)
+            .title_top(title)
             .fg(color);
         let [outer_width, outer_height] = outer_size(
             &block, 

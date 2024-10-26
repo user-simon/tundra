@@ -364,8 +364,8 @@ macro_rules! form {
                 __internal::format_dialog(&mut fields, self.__message.as_ref(), self.__title.as_ref())
             }
             
-            fn input(mut self, key: KeyEvent) -> $crate::Signal<Self> {
-                use $crate::{Signal, field::InputResult};
+            fn input(mut self, key: $crate::KeyEvent) -> $crate::Signal<Self> {
+                use $crate::{Signal, KeyEvent, KeyCode, KeyModifiers, field::InputResult};
 
                 type Dispatch<'a> = fn(&mut __Form, KeyEvent) -> InputResult;
 

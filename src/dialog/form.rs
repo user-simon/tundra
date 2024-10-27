@@ -376,20 +376,26 @@ macro_rules! form {
                     |form, key| __internal::input_dispatch(&mut form.$id, &mut form.__control.$id, key)
                 ),*];
 
+                let focus_up = self.__focus.saturating_sub(1);
+                let focus_down = usize::min(self.__focus + 1, __FIELDS - 1);
+
                 match key.code {
                     KeyCode::Esc => Signal::Return(None), 
                     KeyCode::Enter => Signal::Return(Some(self)), 
+                    KeyCode::BackTab => {
+                        self.__focus = focus_up;
+                        Signal::Continue(self)
+                    }
+                    KeyCode::Tab => {
+                        self.__focus = focus_down;
+                        Signal::Continue(self)
+                    }
                     _ => {
                         let dispatch_result = JUMP_TABLE[self.__focus](&mut self, key);
-        
-                        match (dispatch_result, key.code) {
-                            (InputResult::Ignored, KeyCode::Up) => {
-                                self.__focus = self.__focus.saturating_sub(1);
-                            }
-                            (InputResult::Ignored, KeyCode::Down) => {
-                                self.__focus = usize::min(self.__focus + 1, __FIELDS - 1);
-                            }
-                            _ => (), 
+                        self.__focus = match (dispatch_result, key.code) {
+                            (InputResult::Ignored, KeyCode::Up) => focus_up,  
+                            (InputResult::Ignored, KeyCode::Down) => focus_down, 
+                            _ => self.__focus, 
                         };
                         Signal::Continue(self)
                     }

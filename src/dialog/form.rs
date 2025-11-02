@@ -367,34 +367,34 @@ macro_rules! form {
             fn input(mut self, key: $crate::KeyEvent) -> $crate::Signal<Self> {
                 use $crate::{Signal, KeyEvent, KeyCode, KeyModifiers, field::InputResult};
 
-                type Dispatch<'a> = fn(&mut __Form, KeyEvent) -> InputResult;
+                type Trunk<'a> = fn(&mut __Form, KeyEvent) -> InputResult;
 
                 // holds a function pointer that dispatches to the `Field::input` implementation
                 // corresponding to each field. this can then be indexed by `self.__focus` to dispatch the
                 // input event to the correct field
-                const JUMP_TABLE: [Dispatch; __FIELDS] = [$(
-                    |form, key| __internal::input_dispatch(&mut form.$id, &mut form.__control.$id, key)
+                const JUMP_TABLE: [Trunk; __FIELDS] = [$(
+                    |form, key| __internal::input_trunk(&mut form.$id, &mut form.__control.$id, key)
                 ),*];
-
-                let focus_up = self.__focus.saturating_sub(1);
-                let focus_down = usize::min(self.__focus + 1, __FIELDS - 1);
 
                 match key.code {
                     KeyCode::Esc => Signal::Return(None), 
                     KeyCode::Enter => Signal::Return(Some(self)), 
                     KeyCode::BackTab => {
-                        self.__focus = focus_up;
+                        self.__focus = self.__focus.checked_sub(1).unwrap_or(__FIELDS - 1);
                         Signal::Continue(self)
                     }
                     KeyCode::Tab => {
-                        self.__focus = focus_down;
+                        self.__focus = match self.__focus + 1 {
+                            focus if focus >= __FIELDS => 0,
+                            focus => focus, 
+                        };
                         Signal::Continue(self)
                     }
                     _ => {
                         let dispatch_result = JUMP_TABLE[self.__focus](&mut self, key);
                         self.__focus = match (dispatch_result, key.code) {
-                            (InputResult::Ignored, KeyCode::Up) => focus_up,  
-                            (InputResult::Ignored, KeyCode::Down) => focus_down, 
+                            (InputResult::Ignored, KeyCode::Up) => self.__focus.saturating_sub(1),  
+                            (InputResult::Ignored, KeyCode::Down) => usize::min(self.__focus + 1, __FIELDS - 1), 
                             _ => self.__focus, 
                         };
                         Signal::Continue(self)

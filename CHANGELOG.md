@@ -1,3 +1,18 @@
+## v0.4.0: Form quality-of-life
+
+#### Overview:
+
+- Exposed API for showing custom message dialogs via `dialog::message`. 
+- Added the ability to return values from form validation functions via `Result::Ok`. If the `Ok`-value is non-`()`, a tuple of `(entered_values, ok_value)` is returned. Otherwise, just `entered_values` is returned. 
+- Added re-exports of Ratatui and Crossterm to ensure compatiblity. 
+- Changed `field::Radio` rendering to be on a single line for readability.
+- Changed `field::Toggle` handling of min/max values to be through form control statements, and added prefab
+error conditions like `field::toggle::in_range(a, b)`. 
+- Added tab/backtab form keybinds to move field focus while wrapping around the fields. 
+- Added a Nix flake to provide a development environment. 
+- Added a `|` delimiter between control statements to be more intuitive, which also allows e.g. treesitter to properly highlight `if` as a keyword. 
+
+
 ## v0.3.0: Forms 2.0
 
 #### Overview: 

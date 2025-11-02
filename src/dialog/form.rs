@@ -108,8 +108,8 @@
 /// The syntax of a control statement follows the form `if ERR_CONDITION => MESSAGE`, where `ERR_CONDITION`
 /// is either a path to a function (e.g. `str::is_empty`) or a closure (e.g. `|&value| value == 123`), and
 /// `MESSAGE` is a value that implements `Into<Cow<str>>`. Several control statements are given by repeating
-/// the syntax, delimited by a space or newline. Note that the comma that separates different fields in the
-/// macro is given after all control statements. 
+/// the syntax, delimited by `|`. Note that the comma that separates different fields in the macro is given
+/// after all control statements. 
 /// 
 /// For example, to require that the password in the example from before is non-empty and not equal to
 /// "password1": 
@@ -117,7 +117,7 @@
 /// # use tundra::{prelude::*, field::Textbox};
 /// # dialog::form!{
 /// password: Textbox{ name: "Password", value: "admin", hidden }
-///     if str::is_empty => "Password must not be empty"
+///     if str::is_empty => "Password must not be empty" |
 ///     if |value| value == "password1" => "You can choose a better password than that!", 
 /// # [title]: "", 
 /// # [context]: &mut Context::new().unwrap(), 
@@ -265,7 +265,7 @@ macro_rules! form {
             // Optional set of control statements for the field, implementing field validation
             $(
                 if $control:expr => $control_err:literal
-            )*
+            )|*
         ),+, 
         // Form meta data
         $([$meta_id:ident]: $meta_expr:expr),*

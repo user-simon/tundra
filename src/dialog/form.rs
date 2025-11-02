@@ -136,8 +136,8 @@
 /// Since this struct is unspellable by application code, the function must be a closure. It should return a
 /// value of `Result<T, impl ToString>`; `Ok(T)` on validation success, and `Err` with a given error
 /// otherwise. The `Ok` value may be used to store values computed during validation (e.g. the result of
-/// parsing an entered string), and is available via the `Validated` field of the values returned from the
-/// macro. 
+/// parsing an entered string), and if it is non-unit, it is returned from the macro invocation as the second
+/// element in a tuple of `(values, validation_value)`. 
 /// 
 /// Note that the macro has special handling of [`str`] and [`String`] error types such that they are not
 /// needlessly reallocated. 
@@ -211,16 +211,17 @@
 /// // let current_state: &impl State
 /// // let ctx: &mut Context<_>
 /// 
-/// let values = dialog::form!{
+/// let output = dialog::form!{
 ///     ip: Textbox{ name: "IP address" }, 
 ///     [title]: "Enter IP", 
 ///     [context]: ctx, 
 ///     [background]: current_state, 
 ///     [validate]: |values| Ipv4Addr::from_str(values.ip), 
 /// };
-/// if let Some(values) = values {
-///    // type annotation is not required
-///    let ip: Ipv4Addr = values.Validated;
+/// if let Some((values, parsed_ip)) = output {
+///    // type annotations are not required
+///    let parsed_ip: Ipv4Addr = parsed_ip;
+///    let entered_ip: String = values.ip;
 /// }
 /// ```
 /// 
@@ -290,13 +291,9 @@ macro_rules! form {
 
         // holds the owned values of all fields once the form is submitted. 
         #[allow(dead_code)]
-        struct __Values<T> {
-            #[allow(non_snake_case)]
-            Validated: T, 
-            $(
-                $id: <$type as __Field>::Value,
-            )*
-        }
+        struct __Values {$(
+            $id: <$type as __Field>::Value,
+        )*}
 
         // holds the borrowed values of all fields for form validation. 
         #[allow(dead_code)]
@@ -331,13 +328,10 @@ macro_rules! form {
                 )*}
             }
 
-            fn into_values<T>(self, validated: T) -> __Values<T> {
-                __Values {
-                    Validated: validated, 
-                    $(
-                        $id: __Field::into_value(self.$id), 
-                    )*
-                }
+            fn into_values(self) -> __Values {
+                __Values {$(
+                    $id: __Field::into_value(self.$id), 
+                )*}
             }
         }
 
@@ -408,7 +402,7 @@ macro_rules! form {
             bg: &impl $crate::State, 
             ctx: &mut $crate::Context<T>, 
             mut validate: impl std::ops::FnMut(__BorrowedValues) -> __Result<U, __Cow<'a, str>>, 
-        ) -> __Option<__Values<U>> {
+        ) -> __Option<(__Values, U)> {
             use $crate::dialog::Dialog as _;
 
             loop {
@@ -429,7 +423,7 @@ macro_rules! form {
                 };
                 // if either validation fails, show error message and continue. otherwise, return values
                 match validation_result {
-                    __Result::Ok(ok) => break __Option::Some(form.into_values(ok)), 
+                    __Result::Ok(ok) => break __Option::Some((form.into_values(), ok)), 
                     __Result::Err(e) => $crate::dialog::error(e, bg, ctx), 
                 }
             }
@@ -479,11 +473,10 @@ macro_rules! form {
             },)*
         };
 
-        // form validation. invokes `__Meta::validate` and uses autoref specialisation to construct a Cow
-        // from the error type (which might not implement Into<Cow<str>>) without needless allocation. based
-        // on dtolnay's guide at https://github.com/dtolnay/case-studies/tree/master/autoref-specialization. 
-        // note that the bound ToString on the error type in __Meta is not strictly needed but is used for
-        // nicer error handling (which works since Into<Cow<str>> typically implies ToString)
+        // form validation. invokes __Meta::validate and uses autoref specialisation to construct a Cow from
+        // the error type (which might not implement Into<Cow<str>>) without needless allocation. note that
+        // the bound ToString on the error type in __Meta is not strictly needed but is used for nicer error
+        // handling (which works since Into<Cow<str>> typically implies ToString)
         let validate = |values: __BorrowedValues| (meta.validate)(values).map_err(|e| {
             use __internal::make_cow::{ViaIntoCow, ViaToString};
 
@@ -504,7 +497,13 @@ macro_rules! form {
                 $crate::field::Build::build(builder)
             },)*
         };
-        __run(form, meta.background, meta.context, validate)
+
+        // run and return from the form. uses autoref specialisation to return just values if validated_value
+        // is (), and (values, validated_value) otherwise
+        __run(form, meta.background, meta.context, validate).map(|(values, validated_value)| {
+            use __internal::make_output::{WithValidated, WithoutValidated};
+            (&validated_value).tag().make_output(values, validated_value)
+        })
     }}
 }
 
@@ -716,7 +715,7 @@ pub mod internal {
 
     /// Delegates to [`Field::input`] and updates the [`Control::state`]. 
     #[inline(never)]
-    pub fn input_dispatch<T: Field>(field: &mut T, control: &mut Control<T>, key: KeyEvent) -> InputResult {
+    pub fn input_trunk<T: Field>(field: &mut T, control: &mut Control<T>, key: KeyEvent) -> InputResult {
         let result = field.input(key);
         
         if let InputResult::Updated = result {
@@ -867,6 +866,71 @@ pub mod internal {
 
         impl<'a, T: Into<std::borrow::Cow<'a, str>>> ViaIntoCow for T {}
         impl<T: ToString> ViaToString for &T {}
+    }
+
+    /// Implements autoref specialisation to construct finalised output from field values and the value
+    /// returned from form validation. 
+    ///
+    /// The purpose of this is to return `(values, validated_value)` if `validated_value != ()`, and just
+    /// `values` otherwise. 
+    /// 
+    /// Implementation is based on
+    /// [dtolnay's guide](https://github.com/dtolnay/case-studies/tree/master/autoref-specialization). 
+    /// 
+    /// 
+    /// # Examples
+    /// ```
+    /// use tundra::dialog::form::internal::make_output::{WithValidated, WithoutValidated};
+    /// 
+    /// struct Values {
+    ///     foo: String,
+    ///     bar: u32,
+    ///     baz: bool, 
+    /// }
+    /// 
+    /// // validated_value is unit, so only `values` is returned
+    /// let values = Values {
+    ///     foo: "Hello world".into(),
+    ///     bar: 123,
+    ///     baz: true, 
+    /// };
+    /// let validated = ();
+    /// let values: Values = (&validated).tag().make_output(values, validated);
+    ///
+    /// // validated is non-unit, so both values are returned
+    /// let values = Values {
+    ///     foo: "Hello world".into(),
+    ///     bar: 123,
+    ///     baz: true, 
+    /// };
+    /// let validated = vec![1, 2, 3];
+    /// let (values, validated): (Values, Vec<u32>) = (&validated).tag().make_output(values, validated);
+    /// ```
+    pub mod make_output {
+        pub struct TagWith;
+        pub struct TagWithout;
+
+        impl TagWith {
+            pub fn make_output<T, U>(&self, values: T, validated: U) -> (T, U) {
+                (values, validated)
+            }
+        }
+
+        impl TagWithout {
+            pub fn make_output<T>(&self, values: T, _validated: ()) -> T {
+                values
+            }
+        }
+
+        pub trait WithValidated {
+            fn tag(&self) -> TagWith { TagWith }
+        }
+        pub trait WithoutValidated {
+            fn tag(&self) -> TagWithout { TagWithout }
+        }
+
+        impl WithoutValidated for () {}
+        impl<T> WithValidated for &T {}
     }
 }
 

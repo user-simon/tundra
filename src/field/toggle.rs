@@ -146,37 +146,39 @@ impl Field for Toggle {
 /// Check whether number of toggled items is exactly `N`. 
 /// 
 /// Defined for use in field validation for [`Toggle`]. 
-pub fn exactly<const N: usize>(bits: &BitSlice) -> bool {
-    bits.count_ones() == N
+pub fn exactly(n: usize) -> impl Fn(&BitSlice) -> bool {
+    move |bits| bits.count_ones() == n
 }
 
 /// Check whether number of toggled items is not exactly `N`. 
 /// 
 /// Defined for use in field validation for [`Toggle`]. 
-pub fn not_exactly<const N: usize>(bits: &BitSlice) -> bool {
-    bits.count_ones() != N
+pub fn not_exactly(n: usize) -> impl Fn(&BitSlice) -> bool {
+    move |bits| bits.count_ones() != n
 }
 
 /// Check whether number of toggled items is less than `N`. 
 /// 
 /// Defined for use in field validation for [`Toggle`]. 
-pub fn less_than<const N: usize>(bits: &BitSlice) -> bool {
-    bits.count_ones() < N
+pub fn less_than(n: usize) -> impl Fn(&BitSlice) -> bool {
+    move |bits| bits.count_ones() < n
 }
 
 /// Check whether number of toggled items is more than `N`. 
 /// 
 /// Defined for use in field validation for [`Toggle`]. 
-pub fn more_than<const N: usize>(bits: &BitSlice) -> bool {
-    bits.count_ones() > N   
+pub fn more_than(n: usize) -> impl Fn(&BitSlice) -> bool {
+    move |bits| bits.count_ones() > n
 }
 
 /// Check whether number of toggled items is less than `LOW` or more than `HIGH_INCLUSIVE`. 
 /// 
 /// Defined for use in field validation for [`Toggle`]. 
-pub fn outside_range<const LOW: usize, const HIGH_INCLUSIVE: usize>(bits: &BitSlice) -> bool {
-    let count = bits.count_ones();
-    count < LOW || count > HIGH_INCLUSIVE
+pub fn outside_range(low: usize, high_inclusive: usize) -> impl Fn(&BitSlice) -> bool {
+    move |bits| {
+        let count = bits.count_ones();
+        count < low || count > high_inclusive
+    }
 }
 
 /// Constructs a [`Toggle`]. 
